@@ -90,10 +90,10 @@ def test_reassess_creates_new_verdict_and_keeps_old_as_history(client, app_confi
 
     with session_factory() as session:
         job = session.get(Job, job_id)
-        assert len(job.assessments) == 2
-        active = [a for a in job.assessments if a.invalidated_at is None]
+        assert len(job.all_assessments) == 2
+        active = [a for a in job.all_assessments if a.invalidated_at is None]
         assert len(active) == 1
-        invalidated = [a for a in job.assessments if a.invalidated_at is not None]
+        invalidated = [a for a in job.all_assessments if a.invalidated_at is not None]
         assert len(invalidated) == 1
 
 

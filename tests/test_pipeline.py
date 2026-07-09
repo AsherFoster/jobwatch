@@ -90,19 +90,19 @@ def test_reevaluating_a_job_invalidates_its_old_verdict_instead_of_deleting_it(
     llm = FakeLLM(matched=True)
     run(session, config, llm, FakeNotifier(), [scraped("1")], monkeypatch)
     job = session.query(Job).one()
-    first = job.active_assessment()
+    first = job.active_assessment
     assert first is not None and first.invalidated_at is None
 
     first_id = first.id
     set_criteria_text(session, "Completely new criteria")
     assess_single(session, llm, config, job)
 
-    session.expire(job, ["assessments"])
-    assert len(job.assessments) == 2  # old verdict kept, not deleted
-    first_reloaded = next(a for a in job.assessments if a.id == first_id)
+    session.expire(job, ["all_assessments", "active_assessment"])
+    assert len(job.all_assessments) == 2  # old verdict kept, not deleted
+    first_reloaded = next(a for a in job.all_assessments if a.id == first_id)
     assert first_reloaded.invalidated_at is not None
 
-    current = job.active_assessment()
+    current = job.active_assessment
     _, fingerprint = current_criteria(session, config)
     assert current is not None
     assert current.id != first_id

@@ -76,6 +76,22 @@ reevaluated — they're kept, marked as superseded, so you can see how the
 verdict changed. Jobs are only ever *notified* once, so re-analysis won't
 re-ping you about jobs you've seen.
 
+### Database schema changes
+
+Schema migrations are managed with Alembic (`src/jobwatch/migrations/`). The
+app runs pending migrations itself on startup (`serve`, `worker`, and every
+CLI command all call `jobwatch.db.make_engine()`, which does this), so day to
+day you don't need to think about it — including the one-time upgrade of an
+existing pre-Alembic `data/jobwatch.db`, which gets stamped to the matching
+baseline revision automatically.
+
+To add a schema change: edit `src/jobwatch/models.py`, then write a migration
+by hand (`uv run alembic revision -m "..."`) — sqlite's limited `ALTER TABLE`
+support means most non-trivial changes need `op.batch_alter_table(...)`. You
+can also run migrations manually, e.g. against a deployed DB without starting
+the app: `uv run alembic upgrade head` picks up the same `config.toml` (or
+`JOBWATCH_CONFIG`) jobwatch itself reads.
+
 ### Swapping the LLM
 
 Set `[llm] provider = "anthropic"` and `model = "claude-haiku-4-5"` (install the

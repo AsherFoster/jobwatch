@@ -11,7 +11,7 @@
   {% if job.posted_at %} · Posted {{ job.posted_at.strftime("%Y-%m-%d") }}{% endif %}
 </p>
 
-{% set current = job.active_assessment() %}
+{% set current = job.active_assessment %}
 <h2>Assessments</h2>
 <form method="post" action="/jobs/{{ job.id }}/reassess">
   <button type="submit">Reevaluate against current criteria</button>
@@ -19,7 +19,7 @@
     <span class="muted">criteria changed since this job's last verdict</span>
   {% endif %}
 </form>
-{% for a in job.assessments | reverse %}
+{% for a in job.all_assessments | reverse %}
 <p>
   <span class="badge {{ 'yes' if a.matched else 'no' }}">{{ 'match' if a.matched else 'no match' }}</span>
   <span class="score">{{ a.score }}/10</span>

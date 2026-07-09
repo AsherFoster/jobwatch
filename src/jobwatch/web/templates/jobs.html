@@ -6,7 +6,7 @@
   </thead>
   <tbody>
     {% for job in jobs %}
-    {% set current = job.active_assessment() %}
+    {% set current = job.active_assessment %}
     <tr>
       <td>
         <a href="/jobs/{{ job.id }}">{{ job.title }}</a>

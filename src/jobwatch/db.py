@@ -4,41 +4,39 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, event, inspect, text
+from alembic import command
+from alembic.config import Config as AlembicConfig
+from sqlalchemy import Engine, create_engine, event, inspect
 from sqlalchemy.orm import Session, sessionmaker
 
-from jobwatch.models import Base
+MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+BASELINE_REVISION = "0001"  # schema every pre-alembic DB already has
 
 
-def _migrate_legacy_assessments_table(engine: Engine) -> None:
-    """One-off fixup for sqlite DBs created before the `invalidated_at` column
-    existed. There's no migration framework here, so `create_all()` alone can't
-    add a column (or replace the old per-fingerprint unique constraint) on a
-    table that already exists — do it by hand, once, idempotently.
+def run_migrations(engine: Engine) -> None:
+    """Bring the schema up to date via migrations/versions/.
+
+    Runs against `engine`'s own connection rather than opening a fresh one
+    from its URL — required for `sqlite:///:memory:` (a new connection would
+    be a different, empty database) and just more efficient for a real file.
     """
-    if engine.dialect.name != "sqlite":
-        return
-    inspector = inspect(engine)
-    if "assessments" not in inspector.get_table_names():
-        return
-    columns = {c["name"] for c in inspector.get_columns("assessments")}
-    if "invalidated_at" in columns:
-        return
+    cfg = AlembicConfig()
+    cfg.set_main_option("script_location", str(MIGRATIONS_DIR))
 
-    with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE assessments RENAME TO assessments_pre_invalidation"))
-    Base.metadata.create_all(engine)  # recreates `assessments` with the current schema
-    with engine.begin() as conn:
-        # Every pre-existing row was "the" verdict for its (job, fingerprint)
-        # pair under the old delete-then-insert scheme, so all map to active.
-        columns = "id, job_id, criteria_fingerprint, matched, score, reasoning, model, created_at"
-        conn.execute(
-            text(
-                f"INSERT INTO assessments ({columns}) "
-                f"SELECT {columns} FROM assessments_pre_invalidation"
-            )
-        )
-        conn.execute(text("DROP TABLE assessments_pre_invalidation"))
+    with engine.connect() as connection:
+        cfg.attributes["connection"] = connection
+        tables = inspect(connection).get_table_names()
+        # inspect() implicitly opened a transaction on this connection (SQLAlchemy
+        # 2.0 "autobegin"); end it before handing the connection to Alembic, which
+        # won't commit a transaction it didn't start itself — leaving it open would
+        # silently roll back everything Alembic does below on connection close.
+        connection.rollback()
+        if "alembic_version" not in tables and "jobs" in tables:
+            # Pre-alembic DB (previously created by Base.metadata.create_all()).
+            # Its schema already matches the baseline — record that instead of
+            # re-running create_table() against tables that already exist.
+            command.stamp(cfg, BASELINE_REVISION)
+        command.upgrade(cfg, "head")
 
 
 def make_engine(database_url: str) -> Engine:
@@ -58,8 +56,7 @@ def make_engine(database_url: str) -> Engine:
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
 
-    _migrate_legacy_assessments_table(engine)
-    Base.metadata.create_all(engine)
+    run_migrations(engine)
     return engine
 
 

@@ -38,7 +38,7 @@ def create_app(config: Config) -> FastAPI:
             _, fingerprint = current_criteria(session, config)
             query = (
                 select(Job)
-                .options(selectinload(Job.assessments))
+                .options(selectinload(Job.all_assessments), selectinload(Job.active_assessment))
                 .order_by(Job.scraped_at.desc())
                 .limit(500)
             )
@@ -60,7 +60,11 @@ def create_app(config: Config) -> FastAPI:
     @app.get("/jobs/{job_id}", response_class=HTMLResponse)
     def job_detail(request: Request, job_id: int):
         with session_factory() as session:
-            job = session.get(Job, job_id, options=[selectinload(Job.assessments)])
+            job = session.get(
+                Job,
+                job_id,
+                options=[selectinload(Job.all_assessments), selectinload(Job.active_assessment)],
+            )
             if job is None:
                 raise HTTPException(status_code=404)
             _, fingerprint = current_criteria(session, config)

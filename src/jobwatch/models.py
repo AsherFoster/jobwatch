@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Text, UniqueConstraint, text
+from sqlalchemy import DateTime, ForeignKey, Index, Text, UniqueConstraint, and_, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -39,17 +39,20 @@ class Job(Base):
     # never announced twice — even if changed criteria make it match again later.
     notified_at: Mapped[datetime | None]
 
-    assessments: Mapped[list[Assessment]] = relationship(
+    # Every verdict ever produced for this job, oldest first.
+    all_assessments: Mapped[list[Assessment]] = relationship(
         back_populates="job", order_by="Assessment.created_at"
+    )
+    # The current verdict (may be from an older criteria fingerprint if this
+    # job hasn't been reevaluated since the criteria last changed).
+    active_assessment: Mapped[Assessment | None] = relationship(
+        primaryjoin=lambda: and_(Job.id == Assessment.job_id, Assessment.invalidated_at.is_(None)),
+        viewonly=True,
+        uselist=False,
     )
 
     def latest_assessment(self) -> Assessment | None:
-        return self.assessments[-1] if self.assessments else None
-
-    def active_assessment(self) -> Assessment | None:
-        """The current verdict for this job (may be from an older criteria
-        fingerprint if it hasn't been reevaluated since the criteria changed)."""
-        return next((a for a in self.assessments if a.invalidated_at is None), None)
+        return self.all_assessments[-1] if self.all_assessments else None
 
 
 class Setting(Base):
@@ -76,9 +79,9 @@ class Assessment(Base):
     # Set when a newer assessment (reevaluation, or a criteria/model change)
     # supersedes this one. Invalidated rows are kept as history — never deleted
     # — but only the row with invalidated_at IS NULL is "the" current verdict.
-    invalidated_at: Mapped[datetime | None] = mapped_column(default=None)
+    invalidated_at: Mapped[datetime | None]
 
-    job: Mapped[Job] = relationship(back_populates="assessments")
+    job: Mapped[Job] = relationship(back_populates="all_assessments")
 
     __table_args__ = (
         # At most one *active* verdict per job at a time; past verdicts stay
