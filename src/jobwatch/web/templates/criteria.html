@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Criteria · jobwatch{% endblock %}
+{% block content %}
+<h2>Job criteria</h2>
+<p class="muted">
+  Freeform text given to the LLM alongside each job description. Saving a change
+  makes every stored job pending again; the next scheduled run (or
+  <code>jobwatch assess</code>) re-evaluates the backlog.
+</p>
+{% if saved %}<p><span class="badge yes">Saved</span></p>{% endif %}
+<form method="post" action="/criteria">
+  <textarea name="text" rows="14" placeholder="Positives: … Negatives: …">{{ criteria_text }}</textarea>
+  <p><button type="submit">Save</button></p>
+</form>
+{% endblock %}

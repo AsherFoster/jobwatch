@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from jobwatch.config import Config
+from jobwatch.criteria import current_criteria, set_criteria_text
 from jobwatch.db import make_engine, make_session_factory
 from jobwatch.models import Assessment, Job
 
@@ -25,22 +26,24 @@ def create_app(config: Config) -> FastAPI:
     session_factory = make_session_factory(engine)
 
     app = FastAPI(title="jobwatch")
-    fingerprint = config.criteria.fingerprint(config.llm.model)
 
     @app.get("/", response_class=HTMLResponse)
     def list_jobs(request: Request, show: str = "matched"):
-        query = (
-            select(Job)
-            .options(selectinload(Job.assessments))
-            .order_by(Job.scraped_at.desc())
-            .limit(500)
-        )
-        if show in ("matched", "unmatched"):
-            query = query.join(Assessment).where(
-                Assessment.criteria_fingerprint == fingerprint,
-                Assessment.matched if show == "matched" else ~Assessment.matched,
-            )
+        # The criteria (and so the fingerprint) can change at runtime via
+        # /criteria, so look it up per request rather than at startup.
         with session_factory() as session:
+            _, fingerprint = current_criteria(session, config)
+            query = (
+                select(Job)
+                .options(selectinload(Job.assessments))
+                .order_by(Job.scraped_at.desc())
+                .limit(500)
+            )
+            if show in ("matched", "unmatched"):
+                query = query.join(Assessment).where(
+                    Assessment.criteria_fingerprint == fingerprint,
+                    Assessment.matched if show == "matched" else ~Assessment.matched,
+                )
             jobs = session.scalars(query).unique().all()
         return templates.TemplateResponse(
             request,
@@ -55,5 +58,21 @@ def create_app(config: Config) -> FastAPI:
         if job is None:
             raise HTTPException(status_code=404)
         return templates.TemplateResponse(request, "job.html", {"job": job})
+
+    @app.get("/criteria", response_class=HTMLResponse)
+    def edit_criteria(request: Request, saved: bool = False):
+        with session_factory() as session:
+            text, _ = current_criteria(session, config)
+        return templates.TemplateResponse(
+            request,
+            "criteria.html",
+            {"criteria_text": text, "saved": saved, "show": "criteria"},
+        )
+
+    @app.post("/criteria")
+    def save_criteria(text: str = Form("")):
+        with session_factory() as session:
+            set_criteria_text(session, text)
+        return RedirectResponse("/criteria?saved=true", status_code=303)
 
     return app

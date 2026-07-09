@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import jobwatch.pipeline as pipeline_module
+from jobwatch.criteria import set_criteria_text
 from jobwatch.models import Job
 from jobwatch.pipeline import run_pipeline
 from jobwatch.scraper import ScrapedJob
@@ -74,10 +75,17 @@ def test_criteria_change_triggers_reassessment_but_not_renotification(session, c
     run(session, config, llm, notifier, [scraped("1")], monkeypatch)
     assert llm.calls == 1
 
-    config.criteria.text = "Completely new criteria"
+    set_criteria_text(session, "Completely new criteria")  # what the web UI does
     result = run(session, config, llm, notifier, [], monkeypatch)
     assert result.assessed == 1  # backlog re-assessed under the new fingerprint
     assert len(notifier.sent) == 1  # still only the original notification
+
+
+def test_empty_criteria_skips_assessment(session, config, monkeypatch):
+    set_criteria_text(session, "  \n ")
+    result = run(session, config, FakeLLM(), FakeNotifier(), [scraped("1")], monkeypatch)
+    assert result.new_jobs == 1
+    assert result.assessed == 0
 
 
 def test_scrape_failure_does_not_abort_pipeline(session, config, monkeypatch):

@@ -94,7 +94,7 @@ def assess_jobs(config_path: Path, job_id: int | None) -> None:
     """Assess stored jobs that lack a verdict for the current criteria (no scraping).
 
     With JOB_ID, (re-)assess just that job — even if it already has a verdict.
-    Run without arguments after editing your criteria to re-analyse the whole backlog.
+    Run without arguments after editing your criteria (web UI, /criteria) to re-analyse the backlog.
     """
     from jobwatch.llm import make_llm_client
     from jobwatch.models import Job

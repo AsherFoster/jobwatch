@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import tomllib
 from pathlib import Path
 
@@ -27,12 +26,9 @@ class LLMConfig(BaseModel):
 
 
 class CriteriaConfig(BaseModel):
-    text: str
+    """Seeds the criteria text in the DB on first run; edited via the web UI after."""
 
-    def fingerprint(self, model: str) -> str:
-        """Identifies a (criteria, model) combination so jobs can be re-assessed
-        when either changes."""
-        return hashlib.sha256(f"{model}\n{self.text}".encode()).hexdigest()[:16]
+    text: str
 
 
 class DiscordConfig(BaseModel):
@@ -57,7 +53,7 @@ class WebConfig(BaseModel):
 class Config(BaseModel):
     database_url: str = "sqlite:///data/jobwatch.db"
     searches: list[SearchConfig] = Field(min_length=1)
-    criteria: CriteriaConfig
+    criteria: CriteriaConfig | None = None
     llm: LLMConfig = LLMConfig()
     notify: NotifyConfig = NotifyConfig()
     schedule: ScheduleConfig = ScheduleConfig()
