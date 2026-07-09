@@ -89,7 +89,7 @@ def assess_single(session: Session, llm: LLMClient, config: Config, job_id: int)
             model=config.llm.model,
         )
     )
-    session.commit()
+    session.commit()  # commit per job so a crash mid-batch loses nothing
     return verdict
 
 
@@ -101,22 +101,11 @@ def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
     """
     fingerprint = config.criteria.fingerprint(config.llm.model)
     assessed_ids = select(Assessment.job_id).where(Assessment.criteria_fingerprint == fingerprint)
-    pending = session.scalars(select(Job).where(Job.id.not_in(assessed_ids))).all()
+    pending_ids = session.scalars(select(Job.id).where(Job.id.not_in(assessed_ids))).all()
 
-    for job in pending:
-        verdict = assess_job(llm, job, config.criteria.text)
-        session.add(
-            Assessment(
-                job_id=job.id,
-                criteria_fingerprint=fingerprint,
-                matched=verdict.matched,
-                score=verdict.score,
-                reasoning=verdict.reasoning,
-                model=config.llm.model,
-            )
-        )
-        session.commit()  # commit per job so a crash mid-batch loses nothing
-    return len(pending)
+    for job_id in pending_ids:
+        assess_single(session, llm, config, job_id)
+    return len(pending_ids)
 
 
 def notify_new_matches(session: Session, notifier: Notifier, config: Config) -> list[Job]:
