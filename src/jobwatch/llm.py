@@ -8,6 +8,7 @@ import httpx
 
 from jobwatch.config import LLMConfig
 
+log = structlog.get_logger()
 
 class LLMClient(Protocol):
     model: str
@@ -36,6 +37,9 @@ class OllamaClient:
                 "stream": False,
             },
         )
+        if not response.ok:
+            log.error(response.text)
+
         response.raise_for_status()
         return response.json()["message"]["content"]
 
