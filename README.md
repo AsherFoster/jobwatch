@@ -48,6 +48,8 @@ docker compose up -d --build
 
 The UI is at http://localhost:8000 — matched jobs by default, with unmatched/all
 tabs for auditing. Jobs and every LLM verdict are stored in `data/jobwatch.db`.
+The criteria text is edited on the **Criteria** tab (`/criteria`); it lives in
+the database, and `[criteria]` in config.toml only seeds it on first run.
 
 ### CLI
 
@@ -59,8 +61,8 @@ uv run jobwatch test-notify   # verify the Discord webhook
 
 ### How re-analysis works
 
-Each verdict is keyed by a fingerprint of the criteria text + model. Editing
-`[criteria]` (or switching model) makes every stored job "pending" again, and the
+Each verdict is keyed by a fingerprint of the criteria text + model. Saving new
+criteria on `/criteria` (or switching model) makes every stored job "pending" again, and the
 next pipeline run or `jobwatch assess` re-evaluates the backlog. Jobs are only
 ever *notified* once, so re-analysis won't re-ping you about jobs you've seen.
 

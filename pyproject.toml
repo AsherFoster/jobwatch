@@ -12,6 +12,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "pydantic>=2.0",
     "python-jobspy>=1.1.82",
+    "python-multipart>=0.0.20",
     "sqlalchemy>=2.0.51",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.51.0",

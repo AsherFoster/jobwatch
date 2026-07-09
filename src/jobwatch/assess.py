@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
-import structlog
 import re
 from dataclasses import dataclass
+
+import structlog
 
 from jobwatch.llm import LLMClient
 from jobwatch.models import Job

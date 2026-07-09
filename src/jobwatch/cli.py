@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import structlog
 from pathlib import Path
 
 import click
@@ -62,7 +61,7 @@ def run_once(config_path: Path) -> None:
 def assess(config_path: Path) -> None:
     """Assess stored jobs that lack a verdict for the current criteria (no scraping).
 
-    Run this after editing your criteria to re-analyse the whole backlog.
+    Run this after editing your criteria (web UI, /criteria) to re-analyse the backlog.
     """
     from jobwatch.llm import make_llm_client
     from jobwatch.pipeline import assess_pending

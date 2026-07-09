@@ -19,6 +19,7 @@
     .badge.no { background: #a3333333; }
     .badge.pending { background: #8888; }
     pre { white-space: pre-wrap; }
+    textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 0.5rem; }
   </style>
 </head>
 <body>
@@ -27,6 +28,7 @@
     <a href="/?show=matched" class="{{ 'active' if show == 'matched' else '' }}">Matched</a>
     <a href="/?show=unmatched" class="{{ 'active' if show == 'unmatched' else '' }}">Unmatched</a>
     <a href="/?show=all" class="{{ 'active' if show == 'all' else '' }}">All</a>
+    <a href="/criteria" class="{{ 'active' if show == 'criteria' else '' }}">Criteria</a>
   </nav>
   {% block content %}{% endblock %}
 </body>

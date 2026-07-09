@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import structlog
 from dataclasses import dataclass, field
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from jobwatch.assess import assess_job
 from jobwatch.config import Config
+from jobwatch.criteria import current_criteria
 from jobwatch.llm import LLMClient
 from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.notify import Notifier
@@ -57,14 +58,18 @@ def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
     """Assess every job that has no assessment for the current criteria/model.
 
     Covers both newly scraped jobs and the full backlog after a criteria change —
-    this is what makes editing config.toml trigger re-analysis.
+    this is what makes editing the criteria in the web UI trigger re-analysis.
     """
-    fingerprint = config.criteria.fingerprint(config.llm.model)
+    criteria_text, fingerprint = current_criteria(session, config)
+    if not criteria_text.strip():
+        logger.warning("Criteria text is empty; skipping assessment. Edit it at /criteria.")
+        return 0
+
     assessed_ids = select(Assessment.job_id).where(Assessment.criteria_fingerprint == fingerprint)
     pending = session.scalars(select(Job).where(Job.id.not_in(assessed_ids))).all()
 
     for job in pending:
-        verdict = assess_job(llm, job, config.criteria.text)
+        verdict = assess_job(llm, job, criteria_text)
         session.add(
             Assessment(
                 job_id=job.id,
@@ -81,7 +86,7 @@ def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
 
 def notify_new_matches(session: Session, notifier: Notifier, config: Config) -> list[Job]:
     """Send a single notification for matched jobs that were never announced."""
-    fingerprint = config.criteria.fingerprint(config.llm.model)
+    _, fingerprint = current_criteria(session, config)
     matches = session.scalars(
         select(Job)
         .join(Assessment)
