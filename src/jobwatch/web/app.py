@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from jobwatch.config import Config
-from jobwatch.criteria import current_criteria, set_criteria_text
+from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import make_engine, make_session_factory
 from jobwatch.llm import make_llm_client
 from jobwatch.models import Assessment, Job
@@ -32,10 +32,7 @@ def create_app(config: Config) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     def list_jobs(request: Request, show: str = "matched"):
-        # The criteria (and so the fingerprint) can change at runtime via
-        # /criteria, so look it up per request rather than at startup.
         with session_factory() as session:
-            _, fingerprint = current_criteria(session, config)
             query = (
                 select(Job)
                 .options(selectinload(Job.all_assessments), selectinload(Job.active_assessment))
@@ -54,7 +51,7 @@ def create_app(config: Config) -> FastAPI:
         return templates.TemplateResponse(
             request,
             "jobs.html",
-            {"jobs": jobs, "show": show, "fingerprint": fingerprint},
+            {"jobs": jobs, "show": show},
         )
 
     @app.get("/jobs/{job_id}", response_class=HTMLResponse)
@@ -67,10 +64,7 @@ def create_app(config: Config) -> FastAPI:
             )
             if job is None:
                 raise HTTPException(status_code=404)
-            _, fingerprint = current_criteria(session, config)
-        return templates.TemplateResponse(
-            request, "job.html", {"job": job, "fingerprint": fingerprint}
-        )
+        return templates.TemplateResponse(request, "job.html", {"job": job})
 
     @app.post("/jobs/{job_id}/reassess")
     def reassess(job_id: int):
@@ -84,7 +78,7 @@ def create_app(config: Config) -> FastAPI:
     @app.get("/criteria", response_class=HTMLResponse)
     def edit_criteria(request: Request, saved: bool = False):
         with session_factory() as session:
-            text, _ = current_criteria(session, config)
+            text = get_criteria_text(session)
         return templates.TemplateResponse(
             request,
             "criteria.html",

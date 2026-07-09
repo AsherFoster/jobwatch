@@ -1,35 +1,21 @@
-"""The criteria text lives in the DB so the web UI can edit it.
+"""The criteria text lives in the DB, edited via the web UI at /criteria.
 
-config.toml's [criteria] section only seeds the value on first run; after that
-the settings table is the source of truth.
+It's blank until configured there — there's no config.toml seed for it.
 """
 
 from __future__ import annotations
 
-import hashlib
-
 from sqlalchemy.orm import Session
 
-from jobwatch.config import Config
 from jobwatch.models import Setting
 
 CRITERIA_KEY = "criteria_text"
 
 
-def criteria_fingerprint(text: str, model: str) -> str:
-    """Identifies a (criteria, model) combination so jobs can be re-assessed
-    when either changes."""
-    return hashlib.sha256(f"{model}\n{text}".encode()).hexdigest()[:16]
-
-
-def get_criteria_text(session: Session, seed: str = "") -> str:
-    """Return the stored criteria text, seeding it on first use."""
+def get_criteria_text(session: Session) -> str:
+    """Return the stored criteria text ("" if never configured)."""
     setting = session.get(Setting, CRITERIA_KEY)
-    if setting is None:
-        setting = Setting(key=CRITERIA_KEY, value=seed)
-        session.add(setting)
-        session.commit()
-    return setting.value
+    return setting.value if setting else ""
 
 
 def set_criteria_text(session: Session, text: str) -> None:
@@ -39,9 +25,3 @@ def set_criteria_text(session: Session, text: str) -> None:
     else:
         setting.value = text
     session.commit()
-
-
-def current_criteria(session: Session, config: Config) -> tuple[str, str]:
-    """(text, fingerprint) for the stored criteria, seeded from config."""
-    text = get_criteria_text(session, seed=config.criteria.text if config.criteria else "")
-    return text, criteria_fingerprint(text, config.llm.model)

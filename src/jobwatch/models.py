@@ -43,8 +43,8 @@ class Job(Base):
     all_assessments: Mapped[list[Assessment]] = relationship(
         back_populates="job", order_by="Assessment.created_at"
     )
-    # The current verdict (may be from an older criteria fingerprint if this
-    # job hasn't been reevaluated since the criteria last changed).
+    # The current verdict (may predate the latest criteria/model if this job
+    # hasn't been reevaluated since they last changed).
     active_assessment: Mapped[Assessment | None] = relationship(
         primaryjoin=lambda: and_(Job.id == Assessment.job_id, Assessment.invalidated_at.is_(None)),
         viewonly=True,
@@ -70,7 +70,6 @@ class Assessment(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
-    criteria_fingerprint: Mapped[str]
     matched: Mapped[bool]
     score: Mapped[int]  # 0-10
     reasoning: Mapped[str]
@@ -92,5 +91,4 @@ class Assessment(Base):
             unique=True,
             sqlite_where=text("invalidated_at IS NULL"),
         ),
-        Index("ix_assessments_fingerprint", "criteria_fingerprint"),
     )

@@ -25,12 +25,6 @@ class LLMConfig(BaseModel):
     api_key: str | None = None  # anthropic only; falls back to ANTHROPIC_API_KEY
 
 
-class CriteriaConfig(BaseModel):
-    """Seeds the criteria text in the DB on first run; edited via the web UI after."""
-
-    text: str
-
-
 class DiscordConfig(BaseModel):
     webhook_url: str
 
@@ -53,7 +47,6 @@ class WebConfig(BaseModel):
 class Config(BaseModel):
     database_url: str = "sqlite:///data/jobwatch.db"
     searches: list[SearchConfig] = Field(min_length=1)
-    criteria: CriteriaConfig | None = None
     llm: LLMConfig = LLMConfig()
     notify: NotifyConfig = NotifyConfig()
     schedule: ScheduleConfig = ScheduleConfig()
