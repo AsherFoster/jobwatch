@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import structlog
 from typing import Protocol
 
 import httpx
+import structlog
 
 from jobwatch.config import Config
 from jobwatch.models import Job

@@ -37,10 +37,12 @@ Code should be written in Python, using modern tools like uv, ty, and ruff.
 ```bash
 cp config.example.toml config.toml   # then edit: searches, criteria, webhook URL
 uv sync
-uv run jobwatch serve                # web UI + hourly pipeline
+uv run jobwatch serve                # web UI
+uv run jobwatch worker               # scheduled pipeline (separate process)
 ```
 
-Or in Docker (the intended deployment):
+Or in Docker (the intended deployment — runs `web` and `worker` as separate
+services):
 
 ```bash
 docker compose up -d --build
@@ -52,16 +54,19 @@ tabs for auditing. Jobs and every LLM verdict are stored in `data/jobwatch.db`.
 ### CLI
 
 ```bash
-uv run jobwatch run-once      # one scrape → assess → notify cycle
-uv run jobwatch assess        # (re)assess stored jobs without scraping
-uv run jobwatch test-notify   # verify the Discord webhook
+uv run jobwatch serve              # web UI (no pipeline)
+uv run jobwatch worker             # scrape → assess → notify on a schedule, forever
+uv run jobwatch sync-jobs          # pull new jobs from LinkedIn (no assessment)
+uv run jobwatch assess-jobs        # assess stored jobs without a current verdict
+uv run jobwatch assess-jobs 42     # (re)assess a single job by ID
+uv run jobwatch test-notify        # verify the Discord webhook
 ```
 
 ### How re-analysis works
 
 Each verdict is keyed by a fingerprint of the criteria text + model. Editing
 `[criteria]` (or switching model) makes every stored job "pending" again, and the
-next pipeline run or `jobwatch assess` re-evaluates the backlog. Jobs are only
+next worker run or `jobwatch assess-jobs` re-evaluates the backlog. Jobs are only
 ever *notified* once, so re-analysis won't re-ping you about jobs you've seen.
 
 ### Swapping the LLM

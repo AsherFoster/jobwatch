@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import structlog
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+import structlog
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from jobwatch.assess import assess_job
+from jobwatch.assess import Verdict, assess_job
 from jobwatch.config import Config
 from jobwatch.llm import LLMClient
 from jobwatch.models import Assessment, Job, utcnow
@@ -51,6 +51,46 @@ def store_new_jobs(session: Session, search_name: str, scraped: list[ScrapedJob]
         new += 1
     session.commit()
     return new
+
+
+def sync_jobs(session: Session, config: Config) -> int:
+    """Scrape every configured search and store unseen jobs; returns how many were new."""
+    new = 0
+    for search in config.searches:
+        try:
+            scraped = scrape_search(search)
+        except Exception:
+            logger.exception("Scrape failed for search %r; continuing", search.name)
+            continue
+        new += store_new_jobs(session, search.name, scraped)
+    return new
+
+
+def assess_single(session: Session, llm: LLMClient, config: Config, job_id: int) -> Verdict:
+    """(Re-)assess one job by ID, replacing any verdict for the current criteria/model."""
+    job = session.get(Job, job_id)
+    if job is None:
+        raise LookupError(f"No job with id {job_id}")
+
+    fingerprint = config.criteria.fingerprint(config.llm.model)
+    session.execute(
+        delete(Assessment).where(
+            Assessment.job_id == job.id, Assessment.criteria_fingerprint == fingerprint
+        )
+    )
+    verdict = assess_job(llm, job, config.criteria.text)
+    session.add(
+        Assessment(
+            job_id=job.id,
+            criteria_fingerprint=fingerprint,
+            matched=verdict.matched,
+            score=verdict.score,
+            reasoning=verdict.reasoning,
+            model=config.llm.model,
+        )
+    )
+    session.commit()
+    return verdict
 
 
 def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
@@ -108,14 +148,7 @@ def run_pipeline(
     session: Session, config: Config, llm: LLMClient, notifier: Notifier
 ) -> PipelineResult:
     result = PipelineResult()
-    for search in config.searches:
-        try:
-            scraped = scrape_search(search)
-        except Exception:
-            logger.exception("Scrape failed for search %r; continuing", search.name)
-            continue
-        result.new_jobs += store_new_jobs(session, search.name, scraped)
-
+    result.new_jobs = sync_jobs(session, config)
     result.assessed = assess_pending(session, llm, config)
     result.notified = notify_new_matches(session, notifier, config)
     logger.info(

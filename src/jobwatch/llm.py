@@ -38,7 +38,7 @@ class OllamaClient:
                 "stream": False,
             },
         )
-        if not response.ok:
+        if not response.is_success:
             log.error(response.text)
 
         response.raise_for_status()
