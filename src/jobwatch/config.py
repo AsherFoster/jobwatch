@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import tomllib
 from pathlib import Path
 
@@ -53,6 +54,7 @@ class Config(BaseModel):
     web: WebConfig = WebConfig()
 
 
-def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> Config:
+def load_config() -> Config:
+    path = os.environ.get("JOBWATCH_CONFIG") or DEFAULT_CONFIG_PATH
     with open(path, "rb") as f:
         return Config.model_validate(tomllib.load(f))

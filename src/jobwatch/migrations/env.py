@@ -23,13 +23,9 @@ def _get_url() -> str:
     reuse it instead of duplicating it in alembic.ini. Override with
     `-x config=path/to/config.toml`, or by setting `sqlalchemy.url` directly
     in alembic.ini."""
-    url = config.get_main_option("sqlalchemy.url")
-    if url:
-        return url
     from jobwatch.config import DEFAULT_CONFIG_PATH, load_config
 
-    x_args = context.get_x_argument(as_dictionary=True)
-    config_path = x_args.get("config") or os.environ.get("JOBWATCH_CONFIG") or DEFAULT_CONFIG_PATH
+    config_path = os.environ.get("JOBWATCH_CONFIG") or DEFAULT_CONFIG_PATH
     return load_config(config_path).database_url
 
 
