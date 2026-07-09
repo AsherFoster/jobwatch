@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from jobwatch.assess import Verdict, assess_job
@@ -68,12 +68,17 @@ def sync_jobs(session: Session, config: Config) -> int:
 
 
 def assess_single(session: Session, llm: LLMClient, config: Config, job: Job) -> Verdict:
-    """(Re-)assess one job, replacing any verdict for the current criteria/model."""
+    """(Re-)assess one job under the current criteria.
+
+    Any existing active verdict for this job — from this criteria fingerprint
+    or an older one — is invalidated rather than deleted, so past verdicts
+    stay visible as history on the job's page.
+    """
     criteria_text, fingerprint = current_criteria(session, config)
     session.execute(
-        delete(Assessment).where(
-            Assessment.job_id == job.id, Assessment.criteria_fingerprint == fingerprint
-        )
+        update(Assessment)
+        .where(Assessment.job_id == job.id, Assessment.invalidated_at.is_(None))
+        .values(invalidated_at=utcnow())
     )
     verdict = assess_job(llm, job, criteria_text)
     session.add(
@@ -91,17 +96,19 @@ def assess_single(session: Session, llm: LLMClient, config: Config, job: Job) ->
 
 
 def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
-    """Assess every job that has no assessment for the current criteria/model.
+    """Assess every job that has never been assessed (i.e. has no active verdict).
 
-    Covers both newly scraped jobs and the full backlog after a criteria change —
-    this is what makes editing the criteria in the web UI trigger re-analysis.
+    Editing the criteria does NOT re-trigger this for jobs that already have a
+    verdict — their old verdict just stays displayed as-is. Use assess_single
+    (the web UI's "Reevaluate" button, or `assess-jobs JOB_ID`) to refresh a
+    specific job against the current criteria on demand.
     """
     criteria_text, fingerprint = current_criteria(session, config)
     if not criteria_text.strip():
         logger.warning("Criteria text is empty; skipping assessment. Edit it at /criteria.")
         return 0
 
-    assessed_ids = select(Assessment.job_id).where(Assessment.criteria_fingerprint == fingerprint)
+    assessed_ids = select(Assessment.job_id).where(Assessment.invalidated_at.is_(None))
     pending = session.scalars(select(Job).where(Job.id.not_in(assessed_ids))).all()
 
     for job in pending:
@@ -117,6 +124,7 @@ def notify_new_matches(session: Session, notifier: Notifier, config: Config) -> 
         .join(Assessment)
         .where(
             Assessment.criteria_fingerprint == fingerprint,
+            Assessment.invalidated_at.is_(None),
             Assessment.matched,
             Job.notified_at.is_(None),
         )

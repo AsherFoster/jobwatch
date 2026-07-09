@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, Text, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -46,6 +46,11 @@ class Job(Base):
     def latest_assessment(self) -> Assessment | None:
         return self.assessments[-1] if self.assessments else None
 
+    def active_assessment(self) -> Assessment | None:
+        """The current verdict for this job (may be from an older criteria
+        fingerprint if it hasn't been reevaluated since the criteria changed)."""
+        return next((a for a in self.assessments if a.invalidated_at is None), None)
+
 
 class Setting(Base):
     """Key/value store for settings edited at runtime, e.g. the criteria text."""
@@ -59,10 +64,6 @@ class Setting(Base):
 
 class Assessment(Base):
     __tablename__ = "assessments"
-    __table_args__ = (
-        UniqueConstraint("job_id", "criteria_fingerprint", name="uq_assessment_job_criteria"),
-        Index("ix_assessments_fingerprint", "criteria_fingerprint"),
-    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
@@ -72,5 +73,21 @@ class Assessment(Base):
     reasoning: Mapped[str]
     model: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # Set when a newer assessment (reevaluation, or a criteria/model change)
+    # supersedes this one. Invalidated rows are kept as history — never deleted
+    # — but only the row with invalidated_at IS NULL is "the" current verdict.
+    invalidated_at: Mapped[datetime | None] = mapped_column(default=None)
 
     job: Mapped[Job] = relationship(back_populates="assessments")
+
+    __table_args__ = (
+        # At most one *active* verdict per job at a time; past verdicts stay
+        # around invalidated instead of being deleted or blocking a new row.
+        Index(
+            "uq_assessment_job_active",
+            "job_id",
+            unique=True,
+            sqlite_where=text("invalidated_at IS NULL"),
+        ),
+        Index("ix_assessments_fingerprint", "criteria_fingerprint"),
+    )

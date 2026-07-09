@@ -16,7 +16,9 @@ from sqlalchemy.orm import selectinload
 from jobwatch.config import Config
 from jobwatch.criteria import current_criteria, set_criteria_text
 from jobwatch.db import make_engine, make_session_factory
+from jobwatch.llm import make_llm_client
 from jobwatch.models import Assessment, Job
+from jobwatch.pipeline import assess_single
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -24,6 +26,7 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 def create_app(config: Config) -> FastAPI:
     engine = make_engine(config.database_url)
     session_factory = make_session_factory(engine)
+    llm = make_llm_client(config.llm)
 
     app = FastAPI(title="jobwatch")
 
@@ -40,8 +43,11 @@ def create_app(config: Config) -> FastAPI:
                 .limit(500)
             )
             if show in ("matched", "unmatched"):
+                # Match on each job's current verdict, whichever criteria it was
+                # last evaluated against — editing the criteria doesn't clear
+                # this list, only reevaluating a job does.
                 query = query.join(Assessment).where(
-                    Assessment.criteria_fingerprint == fingerprint,
+                    Assessment.invalidated_at.is_(None),
                     Assessment.matched if show == "matched" else ~Assessment.matched,
                 )
             jobs = session.scalars(query).unique().all()
@@ -55,9 +61,21 @@ def create_app(config: Config) -> FastAPI:
     def job_detail(request: Request, job_id: int):
         with session_factory() as session:
             job = session.get(Job, job_id, options=[selectinload(Job.assessments)])
-        if job is None:
-            raise HTTPException(status_code=404)
-        return templates.TemplateResponse(request, "job.html", {"job": job})
+            if job is None:
+                raise HTTPException(status_code=404)
+            _, fingerprint = current_criteria(session, config)
+        return templates.TemplateResponse(
+            request, "job.html", {"job": job, "fingerprint": fingerprint}
+        )
+
+    @app.post("/jobs/{job_id}/reassess")
+    def reassess(job_id: int):
+        with session_factory() as session:
+            job = session.get(Job, job_id)
+            if job is None:
+                raise HTTPException(status_code=404)
+            assess_single(session, llm, config, job)
+        return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
     @app.get("/criteria", response_class=HTMLResponse)
     def edit_criteria(request: Request, saved: bool = False):

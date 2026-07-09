@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import jobwatch.pipeline as pipeline_module
-from jobwatch.criteria import set_criteria_text
+from jobwatch.criteria import current_criteria, set_criteria_text
 from jobwatch.models import Job
-from jobwatch.pipeline import run_pipeline
+from jobwatch.pipeline import assess_single, run_pipeline
 from jobwatch.scraper import ScrapedJob
 
 
@@ -70,15 +70,43 @@ def test_unmatched_jobs_do_not_notify(session, config, monkeypatch):
     assert notifier.sent == []
 
 
-def test_criteria_change_triggers_reassessment_but_not_renotification(session, config, monkeypatch):
+def test_criteria_change_does_not_reassess_the_backlog(session, config, monkeypatch):
+    """Editing the criteria only affects newly-scraped jobs; already-assessed
+    jobs keep their old verdict until explicitly reevaluated (on-demand)."""
     llm, notifier = FakeLLM(matched=True), FakeNotifier()
     run(session, config, llm, notifier, [scraped("1")], monkeypatch)
     assert llm.calls == 1
 
     set_criteria_text(session, "Completely new criteria")  # what the web UI does
     result = run(session, config, llm, notifier, [], monkeypatch)
-    assert result.assessed == 1  # backlog re-assessed under the new fingerprint
+    assert result.assessed == 0  # job 1 already has a verdict; left alone
+    assert llm.calls == 1
     assert len(notifier.sent) == 1  # still only the original notification
+
+
+def test_reevaluating_a_job_invalidates_its_old_verdict_instead_of_deleting_it(
+    session, config, monkeypatch
+):
+    llm = FakeLLM(matched=True)
+    run(session, config, llm, FakeNotifier(), [scraped("1")], monkeypatch)
+    job = session.query(Job).one()
+    first = job.active_assessment()
+    assert first is not None and first.invalidated_at is None
+
+    first_id = first.id
+    set_criteria_text(session, "Completely new criteria")
+    assess_single(session, llm, config, job)
+
+    session.expire(job, ["assessments"])
+    assert len(job.assessments) == 2  # old verdict kept, not deleted
+    first_reloaded = next(a for a in job.assessments if a.id == first_id)
+    assert first_reloaded.invalidated_at is not None
+
+    current = job.active_assessment()
+    _, fingerprint = current_criteria(session, config)
+    assert current is not None
+    assert current.id != first_id
+    assert current.criteria_fingerprint == fingerprint
 
 
 def test_empty_criteria_skips_assessment(session, config, monkeypatch):

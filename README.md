@@ -59,7 +59,7 @@ the database, and `[criteria]` in config.toml only seeds it on first run.
 uv run jobwatch serve              # web UI (no pipeline)
 uv run jobwatch worker             # scrape → assess → notify on a schedule, forever
 uv run jobwatch sync-jobs          # pull new jobs from LinkedIn (no assessment)
-uv run jobwatch assess-jobs        # assess stored jobs without a current verdict
+uv run jobwatch assess-jobs        # assess stored jobs that have never been assessed
 uv run jobwatch assess-jobs 42     # (re)assess a single job by ID
 uv run jobwatch test-notify        # verify the Discord webhook
 ```
@@ -67,9 +67,14 @@ uv run jobwatch test-notify        # verify the Discord webhook
 ### How re-analysis works
 
 Each verdict is keyed by a fingerprint of the criteria text + model. Saving new
-criteria on `/criteria` (or switching model) makes every stored job "pending" again, and the
-next worker run or `jobwatch assess-jobs` re-evaluates the backlog. Jobs are only
-ever *notified* once, so re-analysis won't re-ping you about jobs you've seen.
+criteria on `/criteria` only affects jobs assessed from then on — it does **not**
+retroactively re-run the backlog, so it's safe to tweak criteria without
+burning LLM calls on every stored job. To refresh a specific job's verdict
+against the current criteria, use the **Reevaluate** button on its page, or
+`jobwatch assess-jobs 42`. A job's older verdicts aren't deleted when it's
+reevaluated — they're kept, marked as superseded, so you can see how the
+verdict changed. Jobs are only ever *notified* once, so re-analysis won't
+re-ping you about jobs you've seen.
 
 ### Swapping the LLM
 

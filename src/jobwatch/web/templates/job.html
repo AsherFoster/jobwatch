@@ -11,12 +11,26 @@
   {% if job.posted_at %} · Posted {{ job.posted_at.strftime("%Y-%m-%d") }}{% endif %}
 </p>
 
+{% set current = job.active_assessment() %}
 <h2>Assessments</h2>
+<form method="post" action="/jobs/{{ job.id }}/reassess">
+  <button type="submit">Reevaluate against current criteria</button>
+  {% if current and current.criteria_fingerprint != fingerprint %}
+    <span class="muted">criteria changed since this job's last verdict</span>
+  {% endif %}
+</form>
 {% for a in job.assessments | reverse %}
 <p>
   <span class="badge {{ 'yes' if a.matched else 'no' }}">{{ 'match' if a.matched else 'no match' }}</span>
   <span class="score">{{ a.score }}/10</span>
-  <span class="muted">{{ a.model }} · {{ a.created_at.strftime("%Y-%m-%d %H:%M") }}</span><br>
+  <span class="muted">
+    {{ a.model }} · {{ a.created_at.strftime("%Y-%m-%d %H:%M") }} ·
+    {% if a.invalidated_at %}
+      superseded {{ a.invalidated_at.strftime("%Y-%m-%d %H:%M") }}
+    {% else %}
+      current
+    {% endif %}
+  </span><br>
   {{ a.reasoning }}
 </p>
 {% else %}
