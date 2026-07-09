@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, Text, UniqueConstraint, and_, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -39,12 +39,20 @@ class Job(Base):
     # never announced twice — even if changed criteria make it match again later.
     notified_at: Mapped[datetime | None]
 
-    assessments: Mapped[list[Assessment]] = relationship(
+    # Every verdict ever produced for this job, oldest first.
+    all_assessments: Mapped[list[Assessment]] = relationship(
         back_populates="job", order_by="Assessment.created_at"
+    )
+    # The current verdict (may be from an older criteria fingerprint if this
+    # job hasn't been reevaluated since the criteria last changed).
+    active_assessment: Mapped[Assessment | None] = relationship(
+        primaryjoin=lambda: and_(Job.id == Assessment.job_id, Assessment.invalidated_at.is_(None)),
+        viewonly=True,
+        uselist=False,
     )
 
     def latest_assessment(self) -> Assessment | None:
-        return self.assessments[-1] if self.assessments else None
+        return self.all_assessments[-1] if self.all_assessments else None
 
 
 class Setting(Base):
@@ -59,10 +67,6 @@ class Setting(Base):
 
 class Assessment(Base):
     __tablename__ = "assessments"
-    __table_args__ = (
-        UniqueConstraint("job_id", "criteria_fingerprint", name="uq_assessment_job_criteria"),
-        Index("ix_assessments_fingerprint", "criteria_fingerprint"),
-    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
@@ -72,5 +76,21 @@ class Assessment(Base):
     reasoning: Mapped[str]
     model: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # Set when a newer assessment (reevaluation, or a criteria/model change)
+    # supersedes this one. Invalidated rows are kept as history — never deleted
+    # — but only the row with invalidated_at IS NULL is "the" current verdict.
+    invalidated_at: Mapped[datetime | None]
 
-    job: Mapped[Job] = relationship(back_populates="assessments")
+    job: Mapped[Job] = relationship(back_populates="all_assessments")
+
+    __table_args__ = (
+        # At most one *active* verdict per job at a time; past verdicts stay
+        # around invalidated instead of being deleted or blocking a new row.
+        Index(
+            "uq_assessment_job_active",
+            "job_id",
+            unique=True,
+            sqlite_where=text("invalidated_at IS NULL"),
+        ),
+        Index("ix_assessments_fingerprint", "criteria_fingerprint"),
+    )

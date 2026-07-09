@@ -5,6 +5,7 @@ description = "Scrape LinkedIn job postings, assess them against your criteria w
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "alembic>=1.18.5",
     "apscheduler>=3.11.3",
     "click>=8.1",
     "fastapi>=0.139.0",

@@ -27,6 +27,10 @@ def make_engine(database_url: str) -> Engine:
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
 
+    # Creates any tables that don't exist yet — fine for a brand new database,
+    # a no-op for one that's already up to date. Doesn't alter existing tables;
+    # schema changes to a live database are applied manually with Alembic (see
+    # src/jobwatch/migrations/ and the README).
     Base.metadata.create_all(engine)
     return engine
 

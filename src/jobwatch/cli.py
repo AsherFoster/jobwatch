@@ -91,10 +91,13 @@ def sync_jobs(config_path: Path) -> None:
 @click.argument("job_id", type=int, required=False)
 @config_option
 def assess_jobs(config_path: Path, job_id: int | None) -> None:
-    """Assess stored jobs that lack a verdict for the current criteria (no scraping).
+    """Assess stored jobs that have never been assessed (no scraping).
 
-    With JOB_ID, (re-)assess just that job — even if it already has a verdict.
-    Run without arguments after editing your criteria (web UI, /criteria) to re-analyse the backlog.
+    With JOB_ID, (re-)assess just that job against the current criteria — even
+    if it already has a verdict; the old verdict is kept as history, not lost.
+    Editing the criteria (web UI, /criteria) does NOT re-queue already-assessed
+    jobs — run this with a JOB_ID (or use the web UI's "Reevaluate" button) to
+    refresh a specific job on demand.
     """
     from jobwatch.llm import make_llm_client
     from jobwatch.models import Job
