@@ -5,8 +5,14 @@ it, so `assessments` needs to allow more than one row per (job, criteria
 fingerprint) over time. The old unconditional unique constraint is replaced
 by a partial unique index that only applies to the still-active row.
 
-Revision ID: 0002
-Revises: 0001
+Only needed for databases that predate this change — run manually with
+`uv run alembic upgrade head` against your deployed DB. A brand new database
+already gets this schema from `Base.metadata.create_all()` on first run, so
+there's no baseline migration here recreating table history that create_all()
+already handles.
+
+Revision ID: 0001
+Revises:
 Create Date: 2026-07-09 16:14:46.865792
 
 """
@@ -17,8 +23,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "0002"
-down_revision: str | Sequence[str] | None = "0001"
+revision: str = "0001"
+down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

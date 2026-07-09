@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -18,15 +19,17 @@ target_metadata = Base.metadata
 
 
 def _get_url() -> str:
-    """jobwatch already owns a database URL (config.toml / --config); reuse it
-    instead of duplicating it in alembic.ini, unless the caller (`db.py`, or a
-    `-x db_url=...` override) has already put one in place."""
+    """jobwatch already owns a database URL (config.toml / $JOBWATCH_CONFIG);
+    reuse it instead of duplicating it in alembic.ini. Override with
+    `-x config=path/to/config.toml`, or by setting `sqlalchemy.url` directly
+    in alembic.ini."""
     url = config.get_main_option("sqlalchemy.url")
     if url:
         return url
     from jobwatch.config import DEFAULT_CONFIG_PATH, load_config
 
-    config_path = context.get_x_argument(as_dictionary=True).get("config", DEFAULT_CONFIG_PATH)
+    x_args = context.get_x_argument(as_dictionary=True)
+    config_path = x_args.get("config") or os.environ.get("JOBWATCH_CONFIG") or DEFAULT_CONFIG_PATH
     return load_config(config_path).database_url
 
 
@@ -44,22 +47,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations against a live DB.
-
-    When invoked from `jobwatch.db.run_migrations()` we're handed an existing
-    Connection (config.attributes["connection"]) so we share the app's engine
-    — this matters for sqlite (a fresh connection to `sqlite:///:memory:`
-    would be a different, empty database) and avoids a second pool for the
-    same file DB. A bare `alembic upgrade head` from the CLI has no such
-    connection, so it opens its own using the URL from `_get_url()`.
-    """
-    connection = config.attributes.get("connection")
-    if connection is not None:
-        context.configure(connection=connection, target_metadata=target_metadata)
-        with context.begin_transaction():
-            context.run_migrations()
-        return
-
+    """Run migrations against a live DB, using the URL from `_get_url()`."""
     section = config.get_section(config.config_ini_section, {})
     section["sqlalchemy.url"] = _get_url()
     connectable = engine_from_config(section, prefix="sqlalchemy.", poolclass=pool.NullPool)

@@ -78,19 +78,25 @@ re-ping you about jobs you've seen.
 
 ### Database schema changes
 
-Schema migrations are managed with Alembic (`src/jobwatch/migrations/`). The
-app runs pending migrations itself on startup (`serve`, `worker`, and every
-CLI command all call `jobwatch.db.make_engine()`, which does this), so day to
-day you don't need to think about it — including the one-time upgrade of an
-existing pre-Alembic `data/jobwatch.db`, which gets stamped to the matching
-baseline revision automatically.
+A brand new database is created straight from `src/jobwatch/models.py` (via
+`Base.metadata.create_all()` on first run) — no migration involved. Alembic
+(`src/jobwatch/migrations/`) only comes in when a schema change needs to be
+applied to a database that already exists, since `create_all()` can add new
+tables but won't alter existing ones. It's run manually, not automatically on
+startup:
 
-To add a schema change: edit `src/jobwatch/models.py`, then write a migration
-by hand (`uv run alembic revision -m "..."`) — sqlite's limited `ALTER TABLE`
-support means most non-trivial changes need `op.batch_alter_table(...)`. You
-can also run migrations manually, e.g. against a deployed DB without starting
-the app: `uv run alembic upgrade head` picks up the same `config.toml` (or
-`JOBWATCH_CONFIG`) jobwatch itself reads.
+```bash
+uv run alembic upgrade head    # apply pending migrations to your deployed DB
+```
+
+This picks up the same `config.toml` (or `JOBWATCH_CONFIG`) jobwatch itself
+reads. There's no "baseline" migration recreating table history — `models.py`
++ `create_all()` already covers a fresh database, so each migration here only
+needs to describe the delta for a database that predates it.
+
+To add a schema change: edit `models.py`, then write a migration by hand
+(`uv run alembic revision -m "..."`) — sqlite's limited `ALTER TABLE` support
+means most non-trivial changes need `op.batch_alter_table(...)`.
 
 ### Swapping the LLM
 
