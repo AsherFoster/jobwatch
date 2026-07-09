@@ -1,0 +1,38 @@
+# Copy to config.toml and edit. config.toml is gitignored (it holds your webhook URL).
+
+# database_url = "sqlite:///data/jobwatch.db"  # any SQLAlchemy URL works
+
+[[searches]]
+name = "swe-denmark"
+search_term = "software engineer"
+location = "Denmark"
+results_wanted = 100   # per run
+hours_old = 24         # only postings newer than this
+
+# Add more [[searches]] blocks for additional queries.
+
+[criteria]
+# Freeform text given to the LLM alongside each job description.
+# Editing this (or the model) triggers re-assessment of all stored jobs.
+text = """
+Positives: Python, backend or platform work, senior roles.
+Negatives: data analysis, pure frontend, consultancies.
+"""
+
+[llm]
+provider = "ollama"    # or "anthropic" (requires: uv sync --extra anthropic)
+model = "qwen3:8b"
+# From inside Docker, the Mac host's Ollama is reachable at host.docker.internal:
+base_url = "http://host.docker.internal:11434"
+# api_key = "sk-ant-..."  # anthropic only; defaults to $ANTHROPIC_API_KEY
+
+[notify.discord]
+webhook_url = "https://discord.com/api/webhooks/CHANGE-ME"
+
+[schedule]
+interval_minutes = 60
+
+[web]
+host = "0.0.0.0"
+port = 8000
+base_url = "http://localhost:8000"  # used for the "review all" link in notifications

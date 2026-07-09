@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<table>
+  <thead>
+    <tr><th>Job</th><th>Location</th><th>Verdict</th><th>Scraped</th></tr>
+  </thead>
+  <tbody>
+    {% for job in jobs %}
+    {% set current = job.assessments | selectattr("criteria_fingerprint", "equalto", fingerprint) | first %}
+    <tr>
+      <td>
+        <a href="/jobs/{{ job.id }}">{{ job.title }}</a>
+        <div class="muted">{{ job.company }} · {{ job.search_name }}</div>
+      </td>
+      <td>{{ job.location }}</td>
+      <td>
+        {% if current %}
+          <span class="badge {{ 'yes' if current.matched else 'no' }}">
+            {{ 'match' if current.matched else 'no match' }}</span>
+          <span class="score">{{ current.score }}/10</span>
+        {% else %}
+          <span class="badge pending">pending</span>
+        {% endif %}
+      </td>
+      <td class="muted">{{ job.scraped_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="muted">No jobs yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

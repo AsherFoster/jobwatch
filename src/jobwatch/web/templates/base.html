@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}jobwatch{% endblock %}</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 60rem; margin: 0 auto; padding: 1rem; }
+    nav { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: baseline; }
+    nav a { text-decoration: none; }
+    nav a.active { font-weight: bold; text-decoration: underline; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #8884; vertical-align: top; }
+    .score { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .muted { opacity: 0.65; font-size: 0.9em; }
+    .badge { border-radius: 0.5rem; padding: 0.1rem 0.5rem; font-size: 0.8em; }
+    .badge.yes { background: #2c7a2c33; }
+    .badge.no { background: #a3333333; }
+    .badge.pending { background: #8888; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <nav>
+    <strong>jobwatch</strong>
+    <a href="/?show=matched" class="{{ 'active' if show == 'matched' else '' }}">Matched</a>
+    <a href="/?show=unmatched" class="{{ 'active' if show == 'unmatched' else '' }}">Unmatched</a>
+    <a href="/?show=all" class="{{ 'active' if show == 'all' else '' }}">All</a>
+  </nav>
+  {% block content %}{% endblock %}
+</body>
+</html>

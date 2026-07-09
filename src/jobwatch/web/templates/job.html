@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} — jobwatch{% endblock %}
+{% block content %}
+<h1>{{ job.title }}</h1>
+<p>
+  {{ job.company }} · {{ job.location }} ·
+  <a href="{{ job.url }}" target="_blank" rel="noopener">View on {{ job.site }}</a>
+</p>
+<p class="muted">
+  Search: {{ job.search_name }} · Scraped {{ job.scraped_at.strftime("%Y-%m-%d %H:%M") }}
+  {% if job.posted_at %} · Posted {{ job.posted_at.strftime("%Y-%m-%d") }}{% endif %}
+</p>
+
+<h2>Assessments</h2>
+{% for a in job.assessments | reverse %}
+<p>
+  <span class="badge {{ 'yes' if a.matched else 'no' }}">{{ 'match' if a.matched else 'no match' }}</span>
+  <span class="score">{{ a.score }}/10</span>
+  <span class="muted">{{ a.model }} · {{ a.created_at.strftime("%Y-%m-%d %H:%M") }}</span><br>
+  {{ a.reasoning }}
+</p>
+{% else %}
+<p class="muted">Not assessed yet.</p>
+{% endfor %}
+
+<h2>Description</h2>
+<pre>{{ job.description or "(no description)" }}</pre>
+{% endblock %}
