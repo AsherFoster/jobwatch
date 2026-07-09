@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from jobwatch.config import Config
-from jobwatch.criteria import current_criteria, set_criteria_text
+from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import make_engine, make_session_factory
 from jobwatch.llm import make_llm_client
 from jobwatch.models import Assessment, Job
@@ -78,7 +78,7 @@ def create_app(config: Config) -> FastAPI:
     @app.get("/criteria", response_class=HTMLResponse)
     def edit_criteria(request: Request, saved: bool = False):
         with session_factory() as session:
-            text = current_criteria(session, config)
+            text = get_criteria_text(session)
         return templates.TemplateResponse(
             request,
             "criteria.html",

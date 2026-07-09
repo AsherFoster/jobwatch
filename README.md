@@ -35,7 +35,7 @@ Code should be written in Python, using modern tools like uv, ty, and ruff.
 ## Getting started
 
 ```bash
-cp config.example.toml config.toml   # then edit: searches, criteria, webhook URL
+cp config.example.toml config.toml   # then edit: searches, webhook URL
 uv sync
 uv run jobwatch serve                # web UI
 uv run jobwatch worker               # scheduled pipeline (separate process)
@@ -51,7 +51,7 @@ docker compose up -d --build
 The UI is at http://localhost:8000 — matched jobs by default, with unmatched/all
 tabs for auditing. Jobs and every LLM verdict are stored in `data/jobwatch.db`.
 The criteria text is edited on the **Criteria** tab (`/criteria`); it lives in
-the database, and `[criteria]` in config.toml only seeds it on first run.
+the database and starts blank — there's no config.toml seed for it.
 
 ### CLI
 

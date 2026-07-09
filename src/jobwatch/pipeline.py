@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from jobwatch.assess import Verdict, assess_job
 from jobwatch.config import Config
-from jobwatch.criteria import current_criteria
+from jobwatch.criteria import get_criteria_text
 from jobwatch.llm import LLMClient
 from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.notify import Notifier
@@ -73,7 +73,7 @@ def assess_single(session: Session, llm: LLMClient, config: Config, job: Job) ->
     Any existing active verdict for this job is invalidated rather than
     deleted, so past verdicts stay visible as history on the job's page.
     """
-    criteria_text = current_criteria(session, config)
+    criteria_text = get_criteria_text(session)
     session.execute(
         update(Assessment)
         .where(Assessment.job_id == job.id, Assessment.invalidated_at.is_(None))
@@ -102,7 +102,7 @@ def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
     button, or `assess-jobs JOB_ID`) to refresh a specific job against the
     current criteria on demand.
     """
-    criteria_text = current_criteria(session, config)
+    criteria_text = get_criteria_text(session)
     if not criteria_text.strip():
         logger.warning("Criteria text is empty; skipping assessment. Edit it at /criteria.")
         return 0

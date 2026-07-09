@@ -1,11 +1,11 @@
-"""The /criteria editor: seeding, saving, and the per-job reevaluate flow."""
+"""The /criteria editor: default state, saving, and the per-job reevaluate flow."""
 
 from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
 
-from jobwatch.config import Config, CriteriaConfig, SearchConfig
+from jobwatch.config import Config, SearchConfig
 from jobwatch.criteria import set_criteria_text
 from jobwatch.db import make_engine, make_session_factory
 from jobwatch.models import Job
@@ -24,7 +24,6 @@ def app_config(tmp_path) -> Config:
     return Config(
         database_url=f"sqlite:///{tmp_path / 'test.db'}",
         searches=[SearchConfig(name="test", search_term="engineer", location="Denmark")],
-        criteria=CriteriaConfig(text="Positives: python."),
     )
 
 
@@ -34,18 +33,24 @@ def client(app_config, monkeypatch) -> TestClient:
     return TestClient(create_app(app_config))
 
 
-def test_criteria_page_seeds_from_config(client):
+def test_criteria_page_starts_blank(client):
     response = client.get("/criteria")
     assert response.status_code == 200
-    assert "Positives: python." in response.text
+    assert "<textarea" in response.text
+    assert 'name="text" rows="14"' in response.text
+    assert "></textarea>" in response.text  # empty: no seeded text between the tags
 
 
 def test_saving_criteria_persists(client):
     # The client follows the 303 back to /criteria, which shows the saved text.
-    response = client.post("/criteria", data={"text": "Negatives: consultancies."})
+    response = client.post("/criteria", data={"text": "Positives: python."})
     assert response.status_code == 200
     assert "Saved" in response.text
 
+    response = client.get("/criteria")
+    assert "Positives: python." in response.text
+
+    response = client.post("/criteria", data={"text": "Negatives: consultancies."})
     response = client.get("/criteria")
     assert "Negatives: consultancies." in response.text
     assert "Positives: python." not in response.text

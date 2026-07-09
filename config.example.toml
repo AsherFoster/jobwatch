@@ -11,15 +11,6 @@ hours_old = 24         # only postings newer than this
 
 # Add more [[searches]] blocks for additional queries.
 
-[criteria]
-# Freeform text given to the LLM alongside each job description. Only seeds the
-# database on first run — after that, edit it in the web UI at /criteria.
-# Saving new criteria there (or switching model) re-assesses all stored jobs.
-text = """
-Positives: Python, backend or platform work, senior roles.
-Negatives: data analysis, pure frontend, consultancies.
-"""
-
 [llm]
 provider = "ollama"    # or "anthropic" (requires: uv sync --extra anthropic)
 model = "qwen3:8b"

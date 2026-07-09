@@ -10,4 +10,3 @@ def test_example_config_loads():
     assert config.searches[0].name == "swe-denmark"
     assert config.llm.provider == "ollama"
     assert config.notify.discord is not None
-    assert config.criteria is not None and "Positives" in config.criteria.text
