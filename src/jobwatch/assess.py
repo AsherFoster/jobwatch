@@ -62,7 +62,7 @@ def assess_job(llm: LLMClient, job: Job, criteria_text: str) -> Verdict:
     response = llm.complete(SYSTEM_PROMPT, build_prompt(job, criteria_text))
     try:
         return parse_verdict(response)
-    except (ValueError, KeyError, json.JSONDecodeError):
+    except ValueError, KeyError, json.JSONDecodeError:
         logger.warning("Unparseable LLM response for job %s: %r", job.id, response[:500])
         return Verdict(
             matched=False, score=0, reasoning=f"LLM response unparseable: {response[:200]}"

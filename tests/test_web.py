@@ -16,7 +16,7 @@ def client(tmp_path) -> TestClient:
         searches=[SearchConfig(name="test", search_term="engineer", location="Denmark")],
         criteria=CriteriaConfig(text="Positives: python."),
     )
-    return TestClient(create_app(config, with_scheduler=False))
+    return TestClient(create_app(config))
 
 
 def test_criteria_page_seeds_from_config(client):
