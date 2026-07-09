@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.0",
     "python-jobspy>=1.1.82",
     "sqlalchemy>=2.0.51",
+    "structlog>=26.1.0",
     "uvicorn[standard]>=0.51.0",
 ]
 

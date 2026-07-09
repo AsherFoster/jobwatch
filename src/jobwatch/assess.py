@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import json
-import logging
+import structlogg
 import re
 from dataclasses import dataclass
 
 from jobwatch.llm import LLMClient
 from jobwatch.models import Job
 
-logger = logging.getLogger(__name__)
+logger = structlog.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
 You screen job postings for a job seeker. You are given their criteria and one job posting.

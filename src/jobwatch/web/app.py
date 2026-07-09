@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import logging
+import structlog
 from contextlib import asynccontextmanager
 from datetime import UTC
 from pathlib import Path
@@ -21,7 +21,7 @@ from jobwatch.models import Assessment, Job
 from jobwatch.notify import make_notifier
 from jobwatch.pipeline import run_pipeline
 
-logger = logging.getLogger(__name__)
+logger = structlog.getLogger(__name__)
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 

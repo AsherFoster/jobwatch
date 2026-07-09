@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import logging
+import structlog
 from dataclasses import dataclass, field
 
 from sqlalchemy import select
@@ -15,7 +15,7 @@ from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.notify import Notifier
 from jobwatch.scraper import ScrapedJob, scrape_search
 
-logger = logging.getLogger(__name__)
+logger = structlog.getLogger(__name__)
 
 
 @dataclass

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import contextlib
 import json
-import logging
+import structlogg
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from jobwatch.config import SearchConfig
 
-logger = logging.getLogger(__name__)
+logger = structlog.getLogger(__name__)
 
 
 @dataclass

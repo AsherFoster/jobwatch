@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import logging
+import structlogg
 from pathlib import Path
 
 import click
@@ -21,7 +21,7 @@ config_option = click.option(
     help="Path to config.toml",
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+structlog.basicConfig(level=structlog.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 
 @click.group(help="Scrape LinkedIn jobs, assess with an LLM, notify on matches.")

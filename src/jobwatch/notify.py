@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import logging
+import structlogg
 from typing import Protocol
 
 import httpx
@@ -10,7 +10,7 @@ import httpx
 from jobwatch.config import Config
 from jobwatch.models import Job
 
-logger = logging.getLogger(__name__)
+logger = structlog.getLogger(__name__)
 
 
 class Notifier(Protocol):
