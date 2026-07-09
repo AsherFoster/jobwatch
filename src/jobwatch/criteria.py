@@ -6,20 +6,12 @@ the settings table is the source of truth.
 
 from __future__ import annotations
 
-import hashlib
-
 from sqlalchemy.orm import Session
 
 from jobwatch.config import Config
 from jobwatch.models import Setting
 
 CRITERIA_KEY = "criteria_text"
-
-
-def criteria_fingerprint(text: str, model: str) -> str:
-    """Identifies a (criteria, model) combination so jobs can be re-assessed
-    when either changes."""
-    return hashlib.sha256(f"{model}\n{text}".encode()).hexdigest()[:16]
 
 
 def get_criteria_text(session: Session, seed: str = "") -> str:
@@ -41,7 +33,6 @@ def set_criteria_text(session: Session, text: str) -> None:
     session.commit()
 
 
-def current_criteria(session: Session, config: Config) -> tuple[str, str]:
-    """(text, fingerprint) for the stored criteria, seeded from config."""
-    text = get_criteria_text(session, seed=config.criteria.text if config.criteria else "")
-    return text, criteria_fingerprint(text, config.llm.model)
+def current_criteria(session: Session, config: Config) -> str:
+    """The stored criteria text, seeded from config."""
+    return get_criteria_text(session, seed=config.criteria.text if config.criteria else "")

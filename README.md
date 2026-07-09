@@ -66,8 +66,7 @@ uv run jobwatch test-notify        # verify the Discord webhook
 
 ### How re-analysis works
 
-Each verdict is keyed by a fingerprint of the criteria text + model. Saving new
-criteria on `/criteria` only affects jobs assessed from then on — it does **not**
+Saving new criteria on `/criteria` only affects jobs assessed from then on — it does **not**
 retroactively re-run the backlog, so it's safe to tweak criteria without
 burning LLM calls on every stored job. To refresh a specific job's verdict
 against the current criteria, use the **Reevaluate** button on its page, or

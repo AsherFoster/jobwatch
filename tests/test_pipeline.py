@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import jobwatch.pipeline as pipeline_module
-from jobwatch.criteria import current_criteria, set_criteria_text
+from jobwatch.criteria import set_criteria_text
 from jobwatch.models import Job
 from jobwatch.pipeline import assess_single, run_pipeline
 from jobwatch.scraper import ScrapedJob
@@ -103,10 +103,8 @@ def test_reevaluating_a_job_invalidates_its_old_verdict_instead_of_deleting_it(
     assert first_reloaded.invalidated_at is not None
 
     current = job.active_assessment
-    _, fingerprint = current_criteria(session, config)
     assert current is not None
     assert current.id != first_id
-    assert current.criteria_fingerprint == fingerprint
 
 
 def test_empty_criteria_skips_assessment(session, config, monkeypatch):

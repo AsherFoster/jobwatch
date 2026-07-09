@@ -70,11 +70,10 @@ def sync_jobs(session: Session, config: Config) -> int:
 def assess_single(session: Session, llm: LLMClient, config: Config, job: Job) -> Verdict:
     """(Re-)assess one job under the current criteria.
 
-    Any existing active verdict for this job — from this criteria fingerprint
-    or an older one — is invalidated rather than deleted, so past verdicts
-    stay visible as history on the job's page.
+    Any existing active verdict for this job is invalidated rather than
+    deleted, so past verdicts stay visible as history on the job's page.
     """
-    criteria_text, fingerprint = current_criteria(session, config)
+    criteria_text = current_criteria(session, config)
     session.execute(
         update(Assessment)
         .where(Assessment.job_id == job.id, Assessment.invalidated_at.is_(None))
@@ -84,7 +83,6 @@ def assess_single(session: Session, llm: LLMClient, config: Config, job: Job) ->
     session.add(
         Assessment(
             job_id=job.id,
-            criteria_fingerprint=fingerprint,
             matched=verdict.matched,
             score=verdict.score,
             reasoning=verdict.reasoning,
@@ -96,14 +94,15 @@ def assess_single(session: Session, llm: LLMClient, config: Config, job: Job) ->
 
 
 def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
-    """Assess every job that has never been assessed (i.e. has no active verdict).
+    """Assess every job that has no active verdict (never assessed, or invalidated).
 
-    Editing the criteria does NOT re-trigger this for jobs that already have a
-    verdict — their old verdict just stays displayed as-is. Use assess_single
-    (the web UI's "Reevaluate" button, or `assess-jobs JOB_ID`) to refresh a
-    specific job against the current criteria on demand.
+    Editing the criteria does NOT invalidate existing verdicts, so it does NOT
+    re-trigger this for jobs that already have one — their old verdict just
+    stays displayed as-is. Use assess_single (the web UI's "Reevaluate"
+    button, or `assess-jobs JOB_ID`) to refresh a specific job against the
+    current criteria on demand.
     """
-    criteria_text, fingerprint = current_criteria(session, config)
+    criteria_text = current_criteria(session, config)
     if not criteria_text.strip():
         logger.warning("Criteria text is empty; skipping assessment. Edit it at /criteria.")
         return 0
@@ -118,12 +117,10 @@ def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
 
 def notify_new_matches(session: Session, notifier: Notifier, config: Config) -> list[Job]:
     """Send a single notification for matched jobs that were never announced."""
-    _, fingerprint = current_criteria(session, config)
     matches = session.scalars(
         select(Job)
         .join(Assessment)
         .where(
-            Assessment.criteria_fingerprint == fingerprint,
             Assessment.invalidated_at.is_(None),
             Assessment.matched,
             Job.notified_at.is_(None),
