@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
-import structlogg
+import structlog
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any

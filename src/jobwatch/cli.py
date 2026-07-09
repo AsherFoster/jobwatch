@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import structlogg
+import structlog
 from pathlib import Path
 
 import click

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import structlogg
+import structlog
 from typing import Protocol
 
 import httpx
