@@ -21,7 +21,6 @@ config_option = click.option(
     help="Path to config.toml",
 )
 
-structlog.basicConfig(level=structlog.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 
 @click.group(help="Scrape LinkedIn jobs, assess with an LLM, notify on matches.")

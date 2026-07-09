@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 import httpx
+import structlog
 
 from jobwatch.config import LLMConfig
 
