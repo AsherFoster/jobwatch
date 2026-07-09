@@ -97,6 +97,7 @@ def assess_jobs(config_path: Path, job_id: int | None) -> None:
     Run without arguments after editing your criteria to re-analyse the whole backlog.
     """
     from jobwatch.llm import make_llm_client
+    from jobwatch.models import Job
     from jobwatch.pipeline import assess_pending, assess_single
 
     config = load_config(config_path)
@@ -104,10 +105,10 @@ def assess_jobs(config_path: Path, job_id: int | None) -> None:
     llm = make_llm_client(config.llm)
     with session_factory() as session:
         if job_id is not None:
-            try:
-                verdict = assess_single(session, llm, config, job_id)
-            except LookupError as exc:
-                raise click.ClickException(str(exc)) from exc
+            job = session.get(Job, job_id)
+            if job is None:
+                raise click.ClickException(f"No job with id {job_id}")
+            verdict = assess_single(session, llm, config, job)
             click.echo(
                 f"Job {job_id}: {'matched' if verdict.matched else 'not matched'} "
                 f"(score {verdict.score}/10) — {verdict.reasoning}"

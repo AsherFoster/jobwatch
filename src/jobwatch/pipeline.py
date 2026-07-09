@@ -66,12 +66,8 @@ def sync_jobs(session: Session, config: Config) -> int:
     return new
 
 
-def assess_single(session: Session, llm: LLMClient, config: Config, job_id: int) -> Verdict:
-    """(Re-)assess one job by ID, replacing any verdict for the current criteria/model."""
-    job = session.get(Job, job_id)
-    if job is None:
-        raise LookupError(f"No job with id {job_id}")
-
+def assess_single(session: Session, llm: LLMClient, config: Config, job: Job) -> Verdict:
+    """(Re-)assess one job, replacing any verdict for the current criteria/model."""
     fingerprint = config.criteria.fingerprint(config.llm.model)
     session.execute(
         delete(Assessment).where(
@@ -101,11 +97,11 @@ def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
     """
     fingerprint = config.criteria.fingerprint(config.llm.model)
     assessed_ids = select(Assessment.job_id).where(Assessment.criteria_fingerprint == fingerprint)
-    pending_ids = session.scalars(select(Job.id).where(Job.id.not_in(assessed_ids))).all()
+    pending = session.scalars(select(Job).where(Job.id.not_in(assessed_ids))).all()
 
-    for job_id in pending_ids:
-        assess_single(session, llm, config, job_id)
-    return len(pending_ids)
+    for job in pending:
+        assess_single(session, llm, config, job)
+    return len(pending)
 
 
 def notify_new_matches(session: Session, notifier: Notifier, config: Config) -> list[Job]:
