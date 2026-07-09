@@ -30,7 +30,6 @@ Assume this is hosted in Docker on a M1 Macbook. LLM is running in Ollama (ideal
 
 Code should be written in Python, using modern tools like uv, ty, and ruff.
 
----
 
 ## Getting started
 
@@ -59,7 +58,7 @@ the database and starts blank — there's no config.toml seed for it.
 uv run jobwatch serve              # web UI (no pipeline)
 uv run jobwatch worker             # scrape → assess → notify on a schedule, forever
 uv run jobwatch sync-jobs          # pull new jobs from LinkedIn (no assessment)
-uv run jobwatch assess-jobs        # assess stored jobs that have never been assessed
+uv run jobwatch assess-jobs        # assess stored jobs
 uv run jobwatch assess-jobs 42     # (re)assess a single job by ID
 uv run jobwatch test-notify        # verify the Discord webhook
 ```
