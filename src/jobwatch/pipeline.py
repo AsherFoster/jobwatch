@@ -9,7 +9,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from jobwatch.assess import Verdict, assess_job
-from jobwatch.config import Config
+from jobwatch.config import config
 from jobwatch.criteria import get_criteria_text
 from jobwatch.llm import LLMClient
 from jobwatch.models import Assessment, Job, utcnow
@@ -54,7 +54,7 @@ def store_new_jobs(session: Session, search_name: str, scraped: list[ScrapedJob]
     return new
 
 
-def sync_jobs(session: Session, config: Config) -> int:
+def sync_jobs(session: Session) -> int:
     """Scrape every configured search and store unseen jobs; returns how many were new."""
     new = 0
     for search in config.searches:
@@ -67,7 +67,7 @@ def sync_jobs(session: Session, config: Config) -> int:
     return new
 
 
-def assess_single(session: Session, llm: LLMClient, config: Config, job: Job) -> Verdict:
+def assess_single(session: Session, llm: LLMClient, job: Job) -> Verdict:
     """(Re-)assess one job under the current criteria.
 
     Any existing active verdict for this job is invalidated rather than
@@ -93,7 +93,7 @@ def assess_single(session: Session, llm: LLMClient, config: Config, job: Job) ->
     return verdict
 
 
-def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
+def assess_pending(session: Session, llm: LLMClient) -> int:
     """Assess every job that has no active verdict (never assessed, or invalidated).
 
     Editing the criteria does NOT invalidate existing verdicts, so it does NOT
@@ -111,11 +111,11 @@ def assess_pending(session: Session, llm: LLMClient, config: Config) -> int:
     pending = session.scalars(select(Job).where(Job.id.not_in(assessed_ids))).all()
 
     for job in pending:
-        assess_single(session, llm, config, job)
+        assess_single(session, llm, job)
     return len(pending)
 
 
-def notify_new_matches(session: Session, notifier: Notifier, config: Config) -> list[Job]:
+def notify_new_matches(session: Session, notifier: Notifier) -> list[Job]:
     """Send a single notification for matched jobs that were never announced."""
     matches = session.scalars(
         select(Job)
@@ -139,13 +139,11 @@ def notify_new_matches(session: Session, notifier: Notifier, config: Config) -> 
     return list(matches)
 
 
-def run_pipeline(
-    session: Session, config: Config, llm: LLMClient, notifier: Notifier
-) -> PipelineResult:
+def run_pipeline(session: Session, llm: LLMClient, notifier: Notifier) -> PipelineResult:
     result = PipelineResult()
-    result.new_jobs = sync_jobs(session, config)
-    result.assessed = assess_pending(session, llm, config)
-    result.notified = notify_new_matches(session, notifier, config)
+    result.new_jobs = sync_jobs(session)
+    result.assessed = assess_pending(session, llm)
+    result.notified = notify_new_matches(session, notifier)
     logger.info(
         "Pipeline done: %d new jobs, %d assessed, %d notified",
         result.new_jobs,

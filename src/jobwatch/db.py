@@ -2,48 +2,41 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from collections.abc import Generator
 
-from sqlalchemy import Engine, create_engine, event
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import Connection, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
+from jobwatch.config import config
 from jobwatch.models import Base
 
 
-def make_engine(database_url: str) -> Engine:
-    if database_url.startswith("sqlite:///"):
-        db_path = Path(database_url.removeprefix("sqlite:///"))
-        if db_path.parent != Path("."):
-            db_path.parent.mkdir(parents=True, exist_ok=True)
+def init_db(connection: Connection) -> None:
+    connection.execute(text("PRAGMA journal_mode=WAL"))
 
-    if database_url == "sqlite:///:memory:":
-        # Plain :memory: hands out a fresh, empty DB per connection by
-        # default — fine for one thread, but e.g. FastAPI's TestClient calls
-        # sync routes from a worker thread. Pin it to a single connection
-        # shared across threads, so callers (tests) see one consistent DB.
-        engine = create_engine(
-            database_url, poolclass=StaticPool, connect_args={"check_same_thread": False}
-        )
-    else:
-        engine = create_engine(database_url)
+    Base.metadata.create_all(connection)
 
-    if engine.dialect.name == "sqlite":
-        # WAL lets the web UI read while the pipeline writes.
-        @event.listens_for(engine, "connect")
-        def _set_sqlite_pragma(dbapi_connection, _record):
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.close()
-
-    # Creates any tables that don't exist yet — fine for a brand new database,
-    # a no-op for one that's already up to date. Doesn't alter existing tables;
-    # schema changes to a live database are applied manually with Alembic (see
-    # src/jobwatch/migrations/ and the README).
-    Base.metadata.create_all(engine)
-    return engine
+    alembic_cfg = Config()
+    alembic_cfg.attributes["connection"] = connection
+    command.stamp(alembic_cfg, "heads")
 
 
-def make_session_factory(engine: Engine) -> sessionmaker[Session]:
-    return sessionmaker(engine, expire_on_commit=False)
+engine = create_engine(config.database_url)
+session_maker = sessionmaker(engine, expire_on_commit=False)
+
+if engine.dialect.name == "sqlite":
+    # WAL lets the web UI read while the pipeline writes.
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, _record):
+        cursor = dbapi_connection.cursor()
+
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
+def get_session() -> Generator[Session]:
+    """Dependency for getting a sync database session."""
+    with session_maker() as session:
+        yield session

@@ -2,8 +2,8 @@ from logging.config import fileConfig
 
 from alembic import context
 
-from jobwatch.config import load_config
-from jobwatch.db import make_engine
+from jobwatch.config import config as app_config
+from jobwatch.db import engine
 from jobwatch.models import Base
 
 # this is the Alembic Config object, which provides
@@ -21,7 +21,7 @@ target_metadata = Base.metadata
 def run_migrations_offline() -> None:
     """Run migrations without a live DB connection, emitting SQL to stdout."""
     context.configure(
-        url=load_config().database_url,
+        url=app_config.database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -35,7 +35,6 @@ def run_migrations_online() -> None:
     """Run migrations against a live DB, reusing jobwatch's own engine setup
     (`make_engine`: sqlite pragmas, dir creation) instead of building a
     separate one from alembic.ini."""
-    engine = make_engine(load_config().database_url)
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():

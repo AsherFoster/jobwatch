@@ -10,9 +10,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from jobwatch.config import Config
 from jobwatch.criteria import set_criteria_text
-from jobwatch.db import make_engine, make_session_factory
 from jobwatch.models import Job
-from jobwatch.web.app import create_app, get_session
+from jobwatch.web.app import app, get_session
 
 
 class FakeLLM:
@@ -23,24 +22,10 @@ class FakeLLM:
 
 
 @pytest.fixture
-def session_factory() -> sessionmaker[Session]:
-    return make_session_factory(make_engine("sqlite:///:memory:"))
-
-
-@pytest.fixture
-def session(session_factory: sessionmaker[Session]) -> Iterator[Session]:
-    """Shadows conftest's `session` fixture: web tests want blank criteria
-    (see test_criteria_page_starts_blank), not the pipeline tests' seeded text."""
-    with session_factory() as s:
-        yield s
-
-
-@pytest.fixture
 def client(
     config: Config, session_factory: sessionmaker[Session], session: Session, monkeypatch
 ) -> TestClient:
     monkeypatch.setattr("jobwatch.web.app.make_llm_client", lambda llm_config: FakeLLM())
-    app = create_app(config)
 
     def override_get_session() -> Iterator[Session]:
         # A fresh session per request, same as get_session in production —

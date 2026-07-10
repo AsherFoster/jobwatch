@@ -39,8 +39,6 @@ class ScheduleConfig(BaseModel):
 
 
 class WebConfig(BaseModel):
-    host: str = "0.0.0.0"
-    port: int = 8000
     # Used to build links in notifications; set to how *you* reach the UI.
     base_url: str = "http://localhost:8000"
 
@@ -54,7 +52,6 @@ class Config(BaseModel):
     web: WebConfig = WebConfig()
 
 
-def load_config() -> Config:
-    path = os.environ.get("JOBWATCH_CONFIG") or DEFAULT_CONFIG_PATH
-    with open(path, "rb") as f:
-        return Config.model_validate(tomllib.load(f))
+path = os.environ.get("JOBWATCH_CONFIG") or DEFAULT_CONFIG_PATH
+with open(path, "rb") as f:
+    config = Config.model_validate(tomllib.load(f))
