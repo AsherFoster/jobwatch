@@ -29,7 +29,7 @@ class OllamaVerdict(BaseModel):
 
 
 class OllamaClient:
-    def __init__(self, model: str, base_url: str = "http://localhost:11434") -> None:
+    def __init__(self, model: str, base_url: str) -> None:
         self.client = AsyncClient(base_url)
         self.model = model
 
