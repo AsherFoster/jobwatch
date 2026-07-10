@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
@@ -18,7 +19,7 @@ def init_db(connection: Connection) -> None:
 
     Base.metadata.create_all(connection)
 
-    alembic_cfg = Config()
+    alembic_cfg = Config(Path(__file__).parent.parent.parent / "alembic.ini")
     alembic_cfg.attributes["connection"] = connection
     command.stamp(alembic_cfg, "heads")
 

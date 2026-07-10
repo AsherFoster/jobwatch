@@ -124,5 +124,16 @@ def test_notify() -> None:
     click.echo("Notification sent")
 
 
+@app.command("init")
+def init() -> None:
+    """Create the database schema and stamp it at the latest migration."""
+    from jobwatch.db import init_db, session_maker
+
+    with session_maker() as session:
+        init_db(session.connection())
+        session.commit()
+    click.echo("Database initialized")
+
+
 if __name__ == "__main__":
     app()
