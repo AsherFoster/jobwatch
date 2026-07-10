@@ -1,3 +1,4 @@
+import re
 import apple_fm_sdk as fm
 
 from jobwatch.llm import Verdict
@@ -28,23 +29,20 @@ class AppleFMClient:
     model = "apple_foundation"
 
     async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
-        system_prompt = """
-You screen job postings for a job seeker. You are given their criteria and one job posting.
-Score whether the job posting is worth their time to review. Err on the side of including a
-job: the job seeker would rather review a borderline posting than miss a real opportunity 
-        """
-        prompt = f"""
-# My criteria
+        clean_description = re.sub(r"\n+", "\n", re.sub(r" +", " ", job.description))
+        system_prompt = f"""
+You screen job postings for a job seeker, and score if the job is a good match for their criteria. 
 
+Their criteria:
 {criteria_text}
+        """
 
-# Job posting
-
+        prompt = f"""
 **{job.title}** at **{job.company}**, in **{job.location}**
 
 --
 
-{job.description}
+{clean_description}
 """
 
         session = fm.LanguageModelSession(instructions=system_prompt)
