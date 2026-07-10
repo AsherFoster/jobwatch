@@ -22,7 +22,7 @@ class FakeLLM:
 
 
 @pytest.fixture
-def client(config: Config, session: Session, monkeypatch) -> TestClient:
+def client(session: Session, monkeypatch) -> TestClient:
     monkeypatch.setattr("jobwatch.web.app.make_llm_client", lambda llm_config: FakeLLM())
 
     def override_get_session() -> Iterator[Session]:

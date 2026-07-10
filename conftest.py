@@ -8,14 +8,6 @@ from jobwatch.config import Config, SearchConfig
 from jobwatch.models import Base
 
 
-@pytest.fixture
-def config() -> Config:
-    return Config(
-        database_url="sqlite:///:memory:",
-        searches=[SearchConfig(name="test", search_term="engineer", location="Denmark")],
-    )
-
-
 @pytest.fixture(scope="session", name="engine")
 def engine_fixture():
     engine = create_engine("sqlite:///:memory:")

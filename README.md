@@ -34,7 +34,7 @@ Code should be written in Python, using modern tools like uv, ty, and ruff.
 ## Getting started
 
 ```bash
-cp config.example.toml config.toml   # then edit: searches, webhook URL
+cp config.example.toml config.toml   # then edit: webhook URL, LLM
 uv sync
 uv run jobwatch serve                # web UI
 uv run jobwatch worker               # scheduled pipeline (separate process)
@@ -51,6 +51,20 @@ The UI is at http://localhost:8000 — matched jobs by default, with unmatched/a
 tabs for auditing. Jobs and every LLM verdict are stored in `data/jobwatch.db`.
 The criteria text is edited on the **Criteria** tab (`/criteria`); it lives in
 the database and starts blank — there's no config.toml seed for it.
+
+The searches also live in the database (a `settings` row named `searches`
+holding a JSON list — see `src/jobwatch/searches.py`), not in config.toml.
+There's no UI for them yet: on a database that predates this, migration 0003
+copies them out of config.toml; otherwise seed the row with:
+
+```bash
+uv run python -c "
+from jobwatch.db import session_maker
+from jobwatch.searches import SearchConfig, set_searches
+with session_maker() as s:
+    set_searches(s, [SearchConfig(name='swe-denmark', search_term='software engineer', location='Denmark')])
+"
+```
 
 ### CLI
 

@@ -47,4 +47,4 @@ target-version = "py314"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["src"]

@@ -29,14 +29,14 @@ def worker() -> None:
     from apscheduler.schedulers.blocking import BlockingScheduler
 
     from jobwatch.config import config
-    from jobwatch.db import get_session
+    from jobwatch.db import session_maker
     from jobwatch.llm import make_llm_client
     from jobwatch.models import utcnow
     from jobwatch.notify import make_notifier
     from jobwatch.pipeline import run_pipeline
 
     def pipeline_tick() -> None:
-        with get_session() as session:
+        with session_maker() as session:
             run_pipeline(session, make_llm_client(config.llm), make_notifier(config))
 
     # Explicit UTC avoids tzlocal(), which fails on POSIX-style TZ values
@@ -57,10 +57,10 @@ def worker() -> None:
 @app.command("sync-jobs")
 def sync_jobs() -> None:
     """Pull new jobs from LinkedIn for every configured search (no assessment)."""
-    from jobwatch.db import get_session
+    from jobwatch.db import session_maker
     from jobwatch.pipeline import sync_jobs as run_sync
 
-    with get_session() as session:
+    with session_maker() as session:
         new = run_sync(session)
     click.echo(f"{new} new jobs")
 
@@ -77,13 +77,13 @@ def assess_jobs(job_id: int | None) -> None:
     refresh a specific job on demand.
     """
     from jobwatch.config import config
-    from jobwatch.db import get_session
+    from jobwatch.db import session_maker
     from jobwatch.llm import make_llm_client
     from jobwatch.models import Job
     from jobwatch.pipeline import assess_pending, assess_single
 
     llm = make_llm_client(config.llm)
-    with get_session() as session:
+    with session_maker() as session:
         if job_id is not None:
             job = session.get(Job, job_id)
             if job is None:
