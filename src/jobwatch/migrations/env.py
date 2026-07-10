@@ -18,16 +18,10 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
-def _get_url() -> str:
-    """jobwatch already owns a database URL (config.toml / $JOBWATCH_CONFIG);
-    reuse it instead of duplicating it in alembic.ini."""
-    return load_config().database_url
-
-
 def run_migrations_offline() -> None:
     """Run migrations without a live DB connection, emitting SQL to stdout."""
     context.configure(
-        url=_get_url(),
+        url=load_config().database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -41,7 +35,7 @@ def run_migrations_online() -> None:
     """Run migrations against a live DB, reusing jobwatch's own engine setup
     (`make_engine`: sqlite pragmas, dir creation) instead of building a
     separate one from alembic.ini."""
-    engine = make_engine(_get_url())
+    engine = make_engine(load_config().database_url)
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
