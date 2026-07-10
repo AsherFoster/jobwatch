@@ -84,6 +84,8 @@ async def reassess(job_id: int, session: SessionDep):
         job,
         criteria_text=get_criteria_text(session),
     )
+
+    session.commit()
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
