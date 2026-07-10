@@ -62,7 +62,7 @@ Decide whether the posting is worth their time to review.
             format=OllamaVerdict.model_json_schema(),
         )
 
-        model_verdict = OllamaVerdict.model_validate(response.message.content)
+        model_verdict = OllamaVerdict.model_validate_json(response.message.content or "")
 
         return Verdict(
             score=model_verdict.score,
