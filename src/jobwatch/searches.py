@@ -1,7 +1,7 @@
 """Searches live in the DB as a settings row holding a JSON list.
 
-There's no UI for them yet: migration 0003 seeds the row from a pre-existing
-config.toml, otherwise set it with `set_searches` (or SQL by hand).
+Edited via the web UI at /settings; migration 0003 seeds the row from a
+pre-existing config.toml.
 """
 
 from __future__ import annotations

@@ -20,6 +20,10 @@
     .badge.pending { background: #8888; }
     pre { white-space: pre-wrap; }
     textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 0.5rem; }
+    .search-form { display: flex; gap: 0.6rem; align-items: end; flex-wrap: wrap; margin-bottom: 0.8rem; }
+    .search-form label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8em; }
+    .search-form input { font: inherit; padding: 0.3rem; }
+    .search-form input[type="number"] { width: 6rem; }
   </style>
 </head>
 <body>
@@ -28,7 +32,7 @@
     <a href="/?show=matched" class="{{ 'active' if show == 'matched' else '' }}">Matched</a>
     <a href="/?show=unmatched" class="{{ 'active' if show == 'unmatched' else '' }}">Unmatched</a>
     <a href="/?show=all" class="{{ 'active' if show == 'all' else '' }}">All</a>
-    <a href="/criteria" class="{{ 'active' if show == 'criteria' else '' }}">Criteria</a>
+    <a href="/settings" class="{{ 'active' if show == 'settings' else '' }}">Settings</a>
   </nav>
   {% block content %}{% endblock %}
 </body>

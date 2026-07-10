@@ -1,4 +1,4 @@
-"""The criteria text lives in the DB, edited via the web UI at /criteria.
+"""The criteria text lives in the DB, edited via the web UI at /settings.
 
 It's blank until configured there — there's no config.toml seed for it.
 """

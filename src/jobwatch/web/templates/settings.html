@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Settings · jobwatch{% endblock %}
+{% block content %}
+<h2>Job criteria</h2>
+<p class="muted">
+  Freeform text given to the LLM alongside each job description. Saving a change
+  only affects new jobs going forward — it does not re-analyse jobs you've already
+  assessed. Use the "Reevaluate" button on a job's page to refresh its verdict
+  against the new criteria.
+</p>
+{% if saved == "criteria" %}<p><span class="badge yes">Saved</span></p>{% endif %}
+<form method="post" action="/settings/criteria">
+  <textarea name="text" rows="14" placeholder="Positives: … Negatives: …">{{ criteria_text }}</textarea>
+  <p><button type="submit">Save</button></p>
+</form>
+
+<h2>Saved searches</h2>
+<p class="muted">
+  The worker runs each of these searches against the job boards on every cycle.
+</p>
+{% if saved == "searches" %}<p><span class="badge yes">Saved</span></p>{% endif %}
+{% for search in searches %}
+<form method="post" action="/settings/searches/{{ loop.index0 }}" class="search-form">
+  <label>Name <input name="name" value="{{ search.name }}" required></label>
+  <label>Search term <input name="search_term" value="{{ search.search_term }}" required></label>
+  <label>Location <input name="location" value="{{ search.location }}" required></label>
+  <label>Results wanted <input name="results_wanted" type="number" min="1" value="{{ search.results_wanted }}" required></label>
+  <label>Hours old <input name="hours_old" type="number" min="1" value="{{ search.hours_old }}" required></label>
+  <button type="submit">Save</button>
+  <button type="submit" formaction="/settings/searches/{{ loop.index0 }}/delete" formnovalidate>Delete</button>
+</form>
+{% else %}
+<p class="muted">No searches configured — the worker has nothing to scrape.</p>
+{% endfor %}
+<h3>Add search</h3>
+<form method="post" action="/settings/searches" class="search-form">
+  <label>Name <input name="name" placeholder="swe-denmark" required></label>
+  <label>Search term <input name="search_term" placeholder="software engineer" required></label>
+  <label>Location <input name="location" placeholder="Denmark" required></label>
+  <label>Results wanted <input name="results_wanted" type="number" min="1" value="100" required></label>
+  <label>Hours old <input name="hours_old" type="number" min="1" value="24" required></label>
+  <button type="submit">Add</button>
+</form>
+{% endblock %}
