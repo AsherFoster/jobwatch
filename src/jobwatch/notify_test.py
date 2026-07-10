@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import httpx
+import httpx2
 import pytest
 
 from jobwatch.models import Job
@@ -29,9 +29,9 @@ def capture_post(monkeypatch):
     def fake_post(url, json=None, timeout=None):
         captured["url"] = url
         captured["json"] = json
-        return httpx.Response(204, request=httpx.Request("POST", url))
+        return httpx2.Response(204, request=httpx2.Request("POST", url))
 
-    monkeypatch.setattr(httpx, "post", fake_post)
+    monkeypatch.setattr(httpx2, "post", fake_post)
     return captured
 
 

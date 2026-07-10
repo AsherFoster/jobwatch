@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-import httpx
+import httpx2
 import structlog
 
 from jobwatch.config import LLMConfig
@@ -24,7 +24,7 @@ class LLMClient(Protocol):
 class OllamaClient:
     def __init__(self, model: str, base_url: str = "http://localhost:11434") -> None:
         self.model = model
-        self._client = httpx.Client(base_url=base_url, timeout=300.0)
+        self._client = httpx2.Client(base_url=base_url, timeout=300.0)
 
     def complete(self, system: str, prompt: str) -> str:
         response = self._client.post(

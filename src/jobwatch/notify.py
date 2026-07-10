@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-import httpx
+import httpx2
 import structlog
 
 from jobwatch.config import config
@@ -33,7 +33,7 @@ class DiscordNotifier:
             lines.append(f"…and {len(jobs) - self.MAX_LISTED} more.")
         lines.append(f"Review all: {review_url}")
 
-        response = httpx.post(self._webhook_url, json={"content": "\n".join(lines)}, timeout=30.0)
+        response = httpx2.post(self._webhook_url, json={"content": "\n".join(lines)}, timeout=30.0)
         response.raise_for_status()
         logger.info("Sent Discord notification for %d jobs", len(jobs))
 
