@@ -1,4 +1,4 @@
-"""Pipeline behaviour with fake scraper/LLM: dedup, re-assessment, notify-once."""
+"""Pipeline behaviour with fake job source/LLM: dedup, re-assessment, notify-once."""
 
 from __future__ import annotations
 
@@ -9,10 +9,14 @@ from jobwatch.criteria import set_criteria_text
 from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.notify import NullNotifier
 from jobwatch.pipeline import assess_single, run_pipeline
-from jobwatch.scraper import ScrapedJob
-from jobwatch.searches import SearchConfig, set_searches
+from jobwatch.search_jobs import JobSource, ScrapedJob, SearchConfig
+from jobwatch.searches import set_searches
 
 SEARCH = SearchConfig(name="test", search_term="engineer", location="Denmark")
+
+
+def fake_source(search_function) -> JobSource:
+    return JobSource(id="fake", name="Fake", search_function=search_function)
 
 
 def scraped(external_id: str, title: str = "Backend Engineer") -> ScrapedJob:
@@ -44,7 +48,7 @@ class FakeLLM:
 def run(session, llm, jobs, monkeypatch, criteria="Positives: python"):
     set_criteria_text(session, criteria)
     set_searches(session, [SEARCH])
-    monkeypatch.setattr(pipeline_module, "scrape_search", lambda search: jobs)
+    monkeypatch.setattr(pipeline_module, "JOB_SOURCES", [fake_source(lambda search: jobs)])
     monkeypatch.setattr(pipeline_module, "make_notifier", NullNotifier)
     run_pipeline(session, llm)
 
@@ -130,15 +134,15 @@ def test_scrape_failure_does_not_abort_pipeline(session, monkeypatch):
         raise RuntimeError("linkedin said no")
 
     set_searches(session, [SEARCH])
-    monkeypatch.setattr(pipeline_module, "scrape_search", boom)
+    monkeypatch.setattr(pipeline_module, "JOB_SOURCES", [fake_source(boom)])
     run_pipeline(session, FakeLLM())
     assert all_jobs(session) == []
 
 
 def test_no_configured_searches_scrapes_nothing(session, monkeypatch):
     def boom(search):
-        raise AssertionError("scrape_search should not be called")
+        raise AssertionError("no source should be searched")
 
-    monkeypatch.setattr(pipeline_module, "scrape_search", boom)
+    monkeypatch.setattr(pipeline_module, "JOB_SOURCES", [fake_source(boom)])
     run_pipeline(session, FakeLLM())
     assert all_jobs(session) == []

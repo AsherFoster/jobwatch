@@ -4,28 +4,15 @@ from __future__ import annotations
 
 import contextlib
 import json
-from dataclasses import dataclass
+from collections.abc import Generator
 from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 
-from jobwatch.searches import SearchConfig
+from jobwatch.search_jobs import JobSource, ScrapedJob, SearchConfig
 
 logger = structlog.getLogger(__name__)
-
-
-@dataclass
-class ScrapedJob:
-    site: str
-    external_id: str
-    title: str
-    company: str
-    location: str
-    url: str
-    description: str
-    posted_at: datetime | None
-    raw: str  # full record as JSON, for re-analysis
 
 
 def _text(record: dict[str, Any], key: str) -> str:
@@ -33,7 +20,7 @@ def _text(record: dict[str, Any], key: str) -> str:
     return "" if value is None or value != value else str(value)  # NaN check
 
 
-def scrape_search(search: SearchConfig) -> list[ScrapedJob]:
+def search_linkedin(search: SearchConfig) -> Generator[ScrapedJob]:
     # Imported lazily: jobspy pulls in pandas, which is slow to import and not
     # needed by the web UI or tests.
     from jobspy import scrape_jobs
@@ -48,7 +35,6 @@ def scrape_search(search: SearchConfig) -> list[ScrapedJob]:
     )
     logger.info("Search %r returned %d jobs", search.name, len(df))
 
-    jobs: list[ScrapedJob] = []
     for record in df.to_dict(orient="records"):
         url = _text(record, "job_url")
         external_id = _text(record, "id") or url
@@ -63,17 +49,17 @@ def scrape_search(search: SearchConfig) -> list[ScrapedJob]:
             with contextlib.suppress(ValueError):
                 posted_at = datetime.fromisoformat(str(date_posted)).replace(tzinfo=UTC)
 
-        jobs.append(
-            ScrapedJob(
-                site=_text(record, "site") or "linkedin",
-                external_id=external_id,
-                title=_text(record, "title"),
-                company=_text(record, "company"),
-                location=_text(record, "location"),
-                url=url,
-                description=_text(record, "description"),
-                posted_at=posted_at,
-                raw=json.dumps(record, default=str),
-            )
+        yield ScrapedJob(
+            site=_text(record, "site") or "linkedin",
+            external_id=external_id,
+            title=_text(record, "title"),
+            company=_text(record, "company"),
+            location=_text(record, "location"),
+            url=url,
+            description=_text(record, "description"),
+            posted_at=posted_at,
+            raw=json.dumps(record, default=str),
         )
-    return jobs
+
+
+linkedin_source = JobSource(id="linkedin", name="LinkedIn", search_function=search_linkedin)

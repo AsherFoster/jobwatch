@@ -6,21 +6,13 @@ config.toml, otherwise set it with `set_searches` (or SQL by hand).
 
 from __future__ import annotations
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import TypeAdapter
 from sqlalchemy.orm import Session
 
 from jobwatch.models import Setting
+from jobwatch.search_jobs import SearchConfig
 
 SEARCHES_KEY = "searches"
-
-
-class SearchConfig(BaseModel):
-    name: str
-    search_term: str
-    location: str
-    results_wanted: int = 100
-    hours_old: int = 24
-
 
 _searches_json = TypeAdapter(list[SearchConfig])
 
