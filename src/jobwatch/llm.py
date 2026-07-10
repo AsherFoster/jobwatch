@@ -57,7 +57,7 @@ class AppleFMClient:
 
     def __init__(self, model: str = "apple-fm") -> None:
         try:
-            import apple_fm_sdk as fm  # ty: ignore[unresolved-import]
+            import apple_fm_sdk as fm
         except ImportError as e:
             raise RuntimeError(
                 "Apple FM provider requires the optional dependency: uv sync --extra apple-fm"

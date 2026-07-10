@@ -12,7 +12,7 @@ import structlog
 
 from jobwatch.search_jobs import JobSource, ScrapedJob, SearchConfig
 
-logger = structlog.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 
 def _text(record: dict[str, Any], key: str) -> str:
@@ -33,7 +33,7 @@ def search_linkedin(search: SearchConfig) -> Generator[ScrapedJob]:
         hours_old=search.hours_old,
         linkedin_fetch_description=True,
     )
-    logger.info("Search %r returned %d jobs", search.name, len(df))
+    log.info("Search %r returned %d jobs", search.name, len(df))
 
     for record in df.to_dict(orient="records"):
         url = _text(record, "job_url")

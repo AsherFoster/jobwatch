@@ -10,7 +10,7 @@ import structlog
 from jobwatch.config import config
 from jobwatch.models import Job
 
-logger = structlog.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 
 class Notifier(Protocol):
@@ -35,14 +35,14 @@ class DiscordNotifier:
 
         response = httpx2.post(self._webhook_url, json={"content": "\n".join(lines)}, timeout=30.0)
         response.raise_for_status()
-        logger.info("Sent Discord notification for %d jobs", len(jobs))
+        log.info("Sent Discord notification for %d jobs", len(jobs))
 
 
 class NullNotifier:
     """Used when no notification channel is configured."""
 
     def send_matches(self, jobs: list[Job], review_url: str) -> None:
-        logger.warning("No notifier configured; %d matches not announced", len(jobs))
+        log.warning("No notifier configured; %d matches not announced", len(jobs))
 
 
 def make_notifier() -> Notifier:

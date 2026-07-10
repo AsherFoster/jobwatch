@@ -16,7 +16,7 @@ from jobwatch.notify import make_notifier
 from jobwatch.search_jobs import ScrapedJob
 from jobwatch.searches import get_searches
 
-logger = structlog.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 
 def store_new_jobs(session: Session, search_name: str, scraped: list[ScrapedJob]) -> int:
@@ -43,28 +43,26 @@ def store_new_jobs(session: Session, search_name: str, scraped: list[ScrapedJob]
             )
         )
         new += 1
-    session.commit()
     return new
 
 
-def sync_jobs(session: Session) -> int:
+def sync_jobs(session: Session) -> None:
     """Run every configured search against every source and store unseen jobs;
     returns how many were new."""
     searches = get_searches(session)
     if not searches:
-        logger.warning("No searches configured; nothing to scrape. See searches.py.")
-    new = 0
+        log.warning("No searches configured; nothing to scrape. See searches.py.")
     for search in searches:
         for source in JOB_SOURCES:
             try:
                 scraped = list(source.search_function(search))
             except Exception:
-                logger.exception(
-                    "Search %r failed on source %r; continuing", search.name, source.id
-                )
+                log.exception("Search %r failed on source %r; continuing", search.name, source.id)
                 continue
-            new += store_new_jobs(session, search.name, scraped)
-    return new
+            log.info("scraped jobs", source=source.id, count=len(scraped))
+            new_count = store_new_jobs(session, search.name, scraped)
+            log.info("saved jobs", source=source.id, count=new_count)
+            session.commit()
 
 
 def get_unassessed_job(session: Session) -> Job | None:
@@ -86,7 +84,7 @@ def assess_pending(session: Session, llm: LLMClient) -> int:
     """
     criteria_text = get_criteria_text(session)
     if not criteria_text.strip():
-        logger.warning("Criteria text is empty; skipping assessment.")
+        log.warning("Criteria text is empty; skipping assessment.")
         return 0
 
     job = get_unassessed_job(session)

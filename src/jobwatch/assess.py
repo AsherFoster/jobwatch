@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from jobwatch.llm import LLMClient
 from jobwatch.models import Assessment, Job
 
-logger = structlog.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
 You screen job postings for a job seeker. You are given their criteria and one job posting.
@@ -64,7 +64,7 @@ def generate_llm_verdict(llm: LLMClient, job: Job, criteria_text: str) -> Verdic
     try:
         return parse_verdict(response)
     except ValueError, KeyError, json.JSONDecodeError:
-        logger.warning("Unparseable LLM response for job %s: %r", job.id, response[:500])
+        log.warning("Unparseable LLM response for job %s: %r", job.id, response[:500])
         return Verdict(
             matched=False, score=0, reasoning=f"LLM response unparseable: {response[:200]}"
         )

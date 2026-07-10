@@ -59,14 +59,13 @@ def worker() -> None:
 
 
 @app.command("sync-jobs")
-def sync_jobs() -> None:
+def sync_jobs_command() -> None:
     """Pull new jobs from LinkedIn for every configured search (no assessment)."""
     from jobwatch.db import session_maker
-    from jobwatch.pipeline import sync_jobs as run_sync
+    from jobwatch.pipeline import sync_jobs
 
     with session_maker() as session:
-        new = run_sync(session)
-    click.echo(f"{new} new jobs")
+        sync_jobs(session)
 
 
 @app.command("assess-jobs")
