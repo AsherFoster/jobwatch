@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
 
 jobs:
@@ -36,3 +36,5 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
       - run: uv run pytest
+        env:
+          JOBWATCH_CONFIG: config.test.toml
