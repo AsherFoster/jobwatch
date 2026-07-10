@@ -18,7 +18,7 @@ from jobwatch.config import config
 from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
-from jobwatch.models import Assessment, Job
+from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.pipeline import assess_single
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -72,8 +72,17 @@ def reassess(job_id: int, session: SessionDep):
     if job is None:
         raise HTTPException(status_code=404)
 
+    if assessment := job.active_assessment:
+        assessment.invalidated_at = utcnow()
+        session.expire(job, ["active_assessment"])
+
     llm = make_llm_client(config.llm)
-    assess_single(session, llm, job)
+    assess_single(
+        session,
+        llm,
+        job,
+        criteria_text=get_criteria_text(session),
+    )
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 

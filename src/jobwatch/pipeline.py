@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -67,9 +65,7 @@ def sync_jobs(session: Session) -> int:
 def get_unassessed_job(session: Session) -> Job | None:
     return session.scalars(
         select(Job)
-        .where(
-            Job.active_assessment.is_(None),
-        )
+        .where(Job.active_assessment == None)  # noqa: E711 — relationship NOT EXISTS
         .order_by(Job.scraped_at)
     ).first()
 
@@ -96,6 +92,7 @@ def assess_pending(session: Session, llm: LLMClient) -> int:
         session.commit()
 
         count += 1
+        job = get_unassessed_job(session)
 
     return count
 

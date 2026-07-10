@@ -7,7 +7,7 @@ from typing import Protocol
 import httpx
 import structlog
 
-from jobwatch.config import Config, config
+from jobwatch.config import config
 from jobwatch.models import Job
 
 logger = structlog.getLogger(__name__)

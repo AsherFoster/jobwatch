@@ -88,6 +88,8 @@ def test_reassess_creates_new_verdict_and_keeps_old_as_history(client, session: 
     assert response.status_code == 200
 
     job = session.get(Job, job_id)
+    session.refresh(job)
+
     assert job is not None
     assert len(job.all_assessments) == 2
     active = [a for a in job.all_assessments if a.invalidated_at is None]

@@ -4,6 +4,11 @@ long-running modes; `sync-jobs` and `assess-jobs` run individual pipeline steps.
 from __future__ import annotations
 
 import click
+import structlog
+
+from jobwatch.criteria import get_criteria_text
+
+log = structlog.get_logger()
 
 
 @click.group(help="Scrape LinkedIn jobs, assess with an LLM, notify on matches.")
@@ -84,10 +89,13 @@ def assess_jobs(job_id: int | None) -> None:
     llm = make_llm_client(config.llm)
     with session_maker() as session:
         if job_id is not None:
+            criteria_text = get_criteria_text(session)
+            assert criteria_text is not None
+
             job = session.get(Job, job_id)
             if job is None:
                 raise click.ClickException(f"No job with id {job_id}")
-            verdict = assess_single(session, llm, job)
+            verdict = assess_single(session, llm, job, criteria_text)
             click.echo(
                 f"Job {job_id}: {'matched' if verdict.matched else 'not matched'} "
                 f"(score {verdict.score}/10) — {verdict.reasoning}"
@@ -112,7 +120,7 @@ def test_notify() -> None:
         external_id="test",
         search_name="test",
     )
-    make_notifier(config).send_matches([fake], review_url=config.web.base_url)
+    make_notifier().send_matches([fake], review_url=config.web.base_url)
     click.echo("Notification sent")
 
 
