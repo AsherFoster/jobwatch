@@ -22,17 +22,11 @@ class FakeLLM:
 
 
 @pytest.fixture
-def client(
-    config: Config, session_factory: sessionmaker[Session], session: Session, monkeypatch
-) -> TestClient:
+def client(config: Config, session: Session, monkeypatch) -> TestClient:
     monkeypatch.setattr("jobwatch.web.app.make_llm_client", lambda llm_config: FakeLLM())
 
     def override_get_session() -> Iterator[Session]:
-        # A fresh session per request, same as get_session in production —
-        # sharing the `session` fixture's engine (same in-memory DB) so tests
-        # can seed/inspect data via `session` without stale cached relations.
-        with session_factory() as s:
-            yield s
+        yield session
 
     app.dependency_overrides[get_session] = override_get_session
     return TestClient(app)
