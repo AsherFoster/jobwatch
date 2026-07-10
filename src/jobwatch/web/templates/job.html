@@ -19,7 +19,7 @@
 {% for a in job.all_assessments | reverse %}
 <p>
   <span class="badge {{ 'yes' if a.matched else 'no' }}">{{ 'match' if a.matched else 'no match' }}</span>
-  <span class="score">{{ a.score }}/10</span>
+  <span class="stars" title="{{ a.score }}/5">{{ '★' * a.score }}{{ '☆' * (5 - a.score) }}</span>
   <span class="muted">
     {{ a.model }} · {{ a.created_at.strftime("%Y-%m-%d %H:%M") }} ·
     {% if a.invalidated_at %}

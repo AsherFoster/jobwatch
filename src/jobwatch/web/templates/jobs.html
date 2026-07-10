@@ -17,7 +17,7 @@
         {% if current %}
           <span class="badge {{ 'yes' if current.matched else 'no' }}">
             {{ 'match' if current.matched else 'no match' }}</span>
-          <span class="score">{{ current.score }}/10</span>
+          <span class="stars" title="{{ current.score }}/5">{{ '★' * current.score }}{{ '☆' * (5 - current.score) }}</span>
         {% else %}
           <span class="badge pending">pending</span>
         {% endif %}

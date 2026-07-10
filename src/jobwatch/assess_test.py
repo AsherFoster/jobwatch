@@ -18,9 +18,9 @@ def make_job() -> Job:
 
 
 def test_parse_clean_json():
-    verdict = parse_verdict('{"matched": true, "score": 8, "reasoning": "Good fit"}')
+    verdict = parse_verdict('{"matched": true, "score": 4, "reasoning": "Good fit"}')
     assert verdict.matched is True
-    assert verdict.score == 8
+    assert verdict.score == 4
     assert verdict.reasoning == "Good fit"
 
 
@@ -31,7 +31,7 @@ def test_parse_json_with_surrounding_chatter():
 
 
 def test_parse_clamps_score():
-    assert parse_verdict('{"matched": true, "score": 99}').score == 10
+    assert parse_verdict('{"matched": true, "score": 99}').score == 5
     assert parse_verdict('{"matched": true, "score": -3}').score == 0
 
 
@@ -60,7 +60,7 @@ def test_generate_llm_verdict_passes_criteria_and_description():
 
         def complete(self, system: str, prompt: str) -> str:
             captured["prompt"] = prompt
-            return '{"matched": true, "score": 7, "reasoning": "ok"}'
+            return '{"matched": true, "score": 4, "reasoning": "ok"}'
 
     verdict = generate_llm_verdict(RecordingLLM(), make_job(), "Positives: python")
     assert verdict.matched is True

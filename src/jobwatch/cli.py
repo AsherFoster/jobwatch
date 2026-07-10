@@ -97,7 +97,7 @@ def assess_jobs(job_id: int | None) -> None:
             verdict = assess_single(session, llm, job, criteria_text)
             click.echo(
                 f"Job {job_id}: {'matched' if verdict.matched else 'not matched'} "
-                f"(score {verdict.score}/10) — {verdict.reasoning}"
+                f"(score {verdict.score}/5) — {verdict.reasoning}"
             )
         else:
             count = assess_pending(session, llm)
