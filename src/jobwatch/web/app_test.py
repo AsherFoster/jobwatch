@@ -1,4 +1,4 @@
-"""The /criteria editor: default state, saving, and the per-job reevaluate flow."""
+"""The /settings page: criteria editing, saved searches, and the per-job reevaluate flow."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from jobwatch.criteria import set_criteria_text
 from jobwatch.models import Job
+from jobwatch.search_jobs import SearchConfig
+from jobwatch.searches import get_searches, set_searches
 from jobwatch.web.app import app, get_session
 
 
@@ -31,27 +33,108 @@ def client(session: Session, monkeypatch) -> TestClient:
     return TestClient(app)
 
 
-def test_criteria_page_starts_blank(client):
-    response = client.get("/criteria")
+def test_settings_page_starts_blank(client):
+    response = client.get("/settings")
     assert response.status_code == 200
     assert "<textarea" in response.text
     assert 'name="text" rows="14"' in response.text
     assert "></textarea>" in response.text  # empty: no seeded text between the tags
+    assert "No searches configured" in response.text
+
+
+def test_old_criteria_url_redirects_to_settings(client):
+    response = client.get("/criteria", follow_redirects=False)
+    assert response.status_code == 301
+    assert response.headers["location"] == "/settings"
 
 
 def test_saving_criteria_persists(client):
-    # The client follows the 303 back to /criteria, which shows the saved text.
-    response = client.post("/criteria", data={"text": "Positives: python."})
+    # The client follows the 303 back to /settings, which shows the saved text.
+    response = client.post("/settings/criteria", data={"text": "Positives: python."})
     assert response.status_code == 200
     assert "Saved" in response.text
 
-    response = client.get("/criteria")
+    response = client.get("/settings")
     assert "Positives: python." in response.text
 
-    response = client.post("/criteria", data={"text": "Negatives: consultancies."})
-    response = client.get("/criteria")
+    response = client.post("/settings/criteria", data={"text": "Negatives: consultancies."})
+    response = client.get("/settings")
     assert "Negatives: consultancies." in response.text
     assert "Positives: python." not in response.text
+
+
+def test_adding_search_persists(client, session: Session):
+    response = client.post(
+        "/settings/searches",
+        data={"name": "swe-dk", "search_term": "software engineer", "location": "Denmark"},
+    )
+    assert response.status_code == 200
+    assert "Saved" in response.text
+
+    assert get_searches(session) == [
+        SearchConfig(name="swe-dk", search_term="software engineer", location="Denmark")
+    ]
+
+
+def test_search_form_is_prefilled(client, session: Session):
+    set_searches(
+        session,
+        [SearchConfig(name="sre-dk", search_term="SRE", location="Denmark", results_wanted=20)],
+    )
+    response = client.get("/settings")
+    assert 'value="sre-dk"' in response.text
+    assert 'value="SRE"' in response.text
+    assert 'value="20"' in response.text
+
+
+def test_updating_search_replaces_it(client, session: Session):
+    set_searches(
+        session,
+        [
+            SearchConfig(name="a", search_term="x", location="y"),
+            SearchConfig(name="b", search_term="x", location="y"),
+        ],
+    )
+    client.post(
+        "/settings/searches/1",
+        data={
+            "name": "b2",
+            "search_term": "platform engineer",
+            "location": "Remote",
+            "results_wanted": "50",
+            "hours_old": "48",
+        },
+    )
+    assert get_searches(session) == [
+        SearchConfig(name="a", search_term="x", location="y"),
+        SearchConfig(
+            name="b2",
+            search_term="platform engineer",
+            location="Remote",
+            results_wanted=50,
+            hours_old=48,
+        ),
+    ]
+
+
+def test_deleting_search_removes_only_that_one(client, session: Session):
+    set_searches(
+        session,
+        [
+            SearchConfig(name="a", search_term="x", location="y"),
+            SearchConfig(name="b", search_term="x", location="y"),
+        ],
+    )
+    response = client.post("/settings/searches/0/delete")
+    assert response.status_code == 200
+    assert get_searches(session) == [SearchConfig(name="b", search_term="x", location="y")]
+
+
+def test_search_index_out_of_range_404s(client, session: Session):
+    set_searches(session, [SearchConfig(name="a", search_term="x", location="y")])
+    data = {"name": "a", "search_term": "x", "location": "y"}
+    assert client.post("/settings/searches/1", data=data).status_code == 404
+    assert client.post("/settings/searches/1/delete").status_code == 404
 
 
 def test_job_list_renders(client):

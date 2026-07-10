@@ -49,22 +49,13 @@ docker compose up -d --build
 
 The UI is at http://localhost:8000 — matched jobs by default, with unmatched/all
 tabs for auditing. Jobs and every LLM verdict are stored in `data/jobwatch.db`.
-The criteria text is edited on the **Criteria** tab (`/criteria`); it lives in
+The criteria text is edited on the **Settings** tab (`/settings`); it lives in
 the database and starts blank — there's no config.toml seed for it.
 
 The searches also live in the database (a `settings` row named `searches`
-holding a JSON list — see `src/jobwatch/searches.py`), not in config.toml.
-There's no UI for them yet: on a database that predates this, migration 0003
-copies them out of config.toml; otherwise seed the row with:
-
-```bash
-uv run python -c "
-from jobwatch.db import session_maker
-from jobwatch.searches import SearchConfig, set_searches
-with session_maker() as s:
-    set_searches(s, [SearchConfig(name='swe-denmark', search_term='software engineer', location='Denmark')])
-"
-```
+holding a JSON list — see `src/jobwatch/searches.py`), not in config.toml, and
+are managed on the same **Settings** tab. On a database that predates this,
+migration 0003 copies them out of config.toml.
 
 ### CLI
 
@@ -79,7 +70,7 @@ uv run jobwatch test-notify        # verify the Discord webhook
 
 ### How re-analysis works
 
-Saving new criteria on `/criteria` only affects jobs assessed from then on — it does **not**
+Saving new criteria on `/settings` only affects jobs assessed from then on — it does **not**
 retroactively re-run the backlog, so it's safe to tweak criteria without
 burning LLM calls on every stored job. To refresh a specific job's verdict
 against the current criteria, use the **Reevaluate** button on its page, or

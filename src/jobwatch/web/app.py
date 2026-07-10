@@ -20,6 +20,8 @@ from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
 from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.pipeline import assess_single
+from jobwatch.search_jobs import SearchConfig
+from jobwatch.searches import get_searches, set_searches
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -86,17 +88,73 @@ def reassess(job_id: int, session: SessionDep):
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
-@app.get("/criteria", response_class=HTMLResponse)
-def edit_criteria(request: Request, session: SessionDep, saved: bool = False):
-    text = get_criteria_text(session)
+@app.get("/settings", response_class=HTMLResponse)
+def settings(request: Request, session: SessionDep, saved: str = ""):
     return templates.TemplateResponse(
         request,
-        "criteria.html",
-        {"criteria_text": text, "saved": saved, "show": "criteria"},
+        "settings.html",
+        {
+            "criteria_text": get_criteria_text(session),
+            "searches": get_searches(session),
+            "saved": saved,
+            "show": "settings",
+        },
     )
 
 
-@app.post("/criteria")
+@app.get("/criteria")
+def criteria_redirect():
+    return RedirectResponse("/settings", status_code=301)
+
+
+@app.post("/settings/criteria")
 def save_criteria(session: SessionDep, text: str = Form("")):
     set_criteria_text(session, text)
-    return RedirectResponse("/criteria?saved=true", status_code=303)
+    return RedirectResponse("/settings?saved=criteria", status_code=303)
+
+
+def search_form(
+    name: Annotated[str, Form()],
+    search_term: Annotated[str, Form()],
+    location: Annotated[str, Form()],
+    results_wanted: Annotated[int, Form()] = 100,
+    hours_old: Annotated[int, Form()] = 24,
+) -> SearchConfig:
+    return SearchConfig(
+        name=name,
+        search_term=search_term,
+        location=location,
+        results_wanted=results_wanted,
+        hours_old=hours_old,
+    )
+
+
+SearchFormDep = Annotated[SearchConfig, Depends(search_form)]
+
+
+@app.post("/settings/searches")
+def add_search(session: SessionDep, search: SearchFormDep):
+    searches = get_searches(session)
+    searches.append(search)
+    set_searches(session, searches)
+    return RedirectResponse("/settings?saved=searches", status_code=303)
+
+
+@app.post("/settings/searches/{index}")
+def update_search(index: int, session: SessionDep, search: SearchFormDep):
+    searches = get_searches(session)
+    if not 0 <= index < len(searches):
+        raise HTTPException(status_code=404)
+    searches[index] = search
+    set_searches(session, searches)
+    return RedirectResponse("/settings?saved=searches", status_code=303)
+
+
+@app.post("/settings/searches/{index}/delete")
+def delete_search(index: int, session: SessionDep):
+    searches = get_searches(session)
+    if not 0 <= index < len(searches):
+        raise HTTPException(status_code=404)
+    del searches[index]
+    set_searches(session, searches)
+    return RedirectResponse("/settings?saved=searches", status_code=303)
