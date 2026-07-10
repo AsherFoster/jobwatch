@@ -71,7 +71,7 @@ class Assessment(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
     matched: Mapped[bool]
-    score: Mapped[int]  # 0-10
+    score: Mapped[int]  # 1-5 stars (0 = response was unparseable)
     reasoning: Mapped[str]
     model: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(default=utcnow)

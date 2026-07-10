@@ -17,7 +17,7 @@ class FakeLLM:
     model = "fake"
 
     def complete(self, system: str, prompt: str) -> str:
-        return '{"matched": true, "score": 9, "reasoning": "good fit"}'
+        return '{"matched": true, "score": 5, "reasoning": "good fit"}'
 
 
 @pytest.fixture

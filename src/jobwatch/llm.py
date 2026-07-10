@@ -69,7 +69,7 @@ class AppleFMClient:
         class Verdict:
             matched: bool = fm.guide("Whether the posting is worth the job seeker's time")
             score: int = fm.guide(
-                "How well the job fits the criteria, 10 = perfect fit", range=(0, 10)
+                "How well the job fits the criteria, 5 = perfect fit", range=(1, 5)
             )
             reasoning: str = fm.guide("One or two sentences explaining the verdict")
 
