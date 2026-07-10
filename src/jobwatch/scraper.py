@@ -10,7 +10,7 @@ from typing import Any
 
 import structlog
 
-from jobwatch.config import SearchConfig
+from jobwatch.searches import SearchConfig
 
 logger = structlog.getLogger(__name__)
 

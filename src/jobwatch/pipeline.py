@@ -15,6 +15,7 @@ from jobwatch.llm import LLMClient
 from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.notify import Notifier
 from jobwatch.scraper import ScrapedJob, scrape_search
+from jobwatch.searches import get_searches
 
 logger = structlog.getLogger(__name__)
 
@@ -56,8 +57,11 @@ def store_new_jobs(session: Session, search_name: str, scraped: list[ScrapedJob]
 
 def sync_jobs(session: Session) -> int:
     """Scrape every configured search and store unseen jobs; returns how many were new."""
+    searches = get_searches(session)
+    if not searches:
+        logger.warning("No searches configured; nothing to scrape. See searches.py.")
     new = 0
-    for search in config.searches:
+    for search in searches:
         try:
             scraped = scrape_search(search)
         except Exception:

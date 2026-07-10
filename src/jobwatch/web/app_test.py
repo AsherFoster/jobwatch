@@ -6,9 +6,8 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
-from jobwatch.config import Config
 from jobwatch.criteria import set_criteria_text
 from jobwatch.models import Job
 from jobwatch.web.app import app, get_session

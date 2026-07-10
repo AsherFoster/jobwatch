@@ -1,4 +1,8 @@
-"""Load and validate config.toml."""
+"""Load and validate config.toml.
+
+Every field has a default, so the file is optional — used mostly to point at
+a real Discord webhook and LLM. Searches live in the DB (see searches.py).
+"""
 
 from __future__ import annotations
 
@@ -6,17 +10,9 @@ import os
 import tomllib
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 DEFAULT_CONFIG_PATH = Path("config.toml")
-
-
-class SearchConfig(BaseModel):
-    name: str
-    search_term: str
-    location: str
-    results_wanted: int = 100
-    hours_old: int = 24
 
 
 class LLMConfig(BaseModel):
@@ -45,7 +41,6 @@ class WebConfig(BaseModel):
 
 class Config(BaseModel):
     database_url: str = "sqlite:///data/jobwatch.db"
-    searches: list[SearchConfig] = Field(min_length=1)
     llm: LLMConfig = LLMConfig()
     notify: NotifyConfig = NotifyConfig()
     schedule: ScheduleConfig = ScheduleConfig()

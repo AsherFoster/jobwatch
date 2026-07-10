@@ -1,15 +1,8 @@
 # Copy to config.toml and edit. config.toml is gitignored (it holds your webhook URL).
+# Every setting has a default, so the file itself is optional.
+# Searches live in the database, not here — see README.
 
 # database_url = "sqlite:///data/jobwatch.db"  # any SQLAlchemy URL works
-
-[[searches]]
-name = "swe-denmark"
-search_term = "software engineer"
-location = "Denmark"
-results_wanted = 100   # per run
-hours_old = 24         # only postings newer than this
-
-# Add more [[searches]] blocks for additional queries.
 
 [llm]
 provider = "ollama"    # or "anthropic" (requires: uv sync --extra anthropic)

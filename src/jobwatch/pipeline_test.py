@@ -7,6 +7,9 @@ from jobwatch.criteria import set_criteria_text
 from jobwatch.models import Job
 from jobwatch.pipeline import assess_single, run_pipeline
 from jobwatch.scraper import ScrapedJob
+from jobwatch.searches import SearchConfig, set_searches
+
+SEARCH = SearchConfig(name="test", search_term="engineer", location="Denmark")
 
 
 def scraped(external_id: str, title: str = "Backend Engineer") -> ScrapedJob:
@@ -43,7 +46,9 @@ class FakeNotifier:
         self.sent.append(list(jobs))
 
 
-def run(session, llm, notifier, jobs, monkeypatch):
+def run(session, llm, notifier, jobs, monkeypatch, criteria="Positives: python"):
+    set_criteria_text(session, criteria)
+    set_searches(session, [SEARCH])
     monkeypatch.setattr(pipeline_module, "scrape_search", lambda search: jobs)
     return run_pipeline(session, llm, notifier)
 
@@ -77,8 +82,8 @@ def test_criteria_change_does_not_reassess_the_backlog(session, monkeypatch):
     run(session, llm, notifier, [scraped("1")], monkeypatch)
     assert llm.calls == 1
 
-    set_criteria_text(session, "Completely new criteria")  # what the web UI does
-    result = run(session, llm, notifier, [], monkeypatch)
+    # Criteria edited (what the web UI does), then the pipeline runs again.
+    result = run(session, llm, notifier, [], monkeypatch, criteria="Completely new criteria")
     assert result.assessed == 0  # job 1 already has a verdict; left alone
     assert llm.calls == 1
     assert len(notifier.sent) == 1  # still only the original notification
@@ -108,8 +113,7 @@ def test_reevaluating_a_job_invalidates_its_old_verdict_instead_of_deleting_it(
 
 
 def test_empty_criteria_skips_assessment(session, monkeypatch):
-    set_criteria_text(session, "  \n ")
-    result = run(session, FakeLLM(), FakeNotifier(), [scraped("1")], monkeypatch)
+    result = run(session, FakeLLM(), FakeNotifier(), [scraped("1")], monkeypatch, criteria="  \n ")
     assert result.new_jobs == 1
     assert result.assessed == 0
 
@@ -117,6 +121,16 @@ def test_empty_criteria_skips_assessment(session, monkeypatch):
 def test_scrape_failure_does_not_abort_pipeline(session, monkeypatch):
     def boom(search):
         raise RuntimeError("linkedin said no")
+
+    set_searches(session, [SEARCH])
+    monkeypatch.setattr(pipeline_module, "scrape_search", boom)
+    result = run_pipeline(session, FakeLLM(), FakeNotifier())
+    assert result.new_jobs == 0
+
+
+def test_no_configured_searches_scrapes_nothing(session, monkeypatch):
+    def boom(search):
+        raise AssertionError("scrape_search should not be called")
 
     monkeypatch.setattr(pipeline_module, "scrape_search", boom)
     result = run_pipeline(session, FakeLLM(), FakeNotifier())
