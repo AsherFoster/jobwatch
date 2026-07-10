@@ -26,6 +26,9 @@ jobwatch = "jobwatch.cli:app"
 anthropic = [
     "anthropic>=0.116.0",
 ]
+apple-fm = [
+    "apple-fm-sdk>=0.2.1",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]

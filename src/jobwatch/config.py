@@ -16,8 +16,8 @@ DEFAULT_CONFIG_PATH = Path("config.toml")
 
 
 class LLMConfig(BaseModel):
-    provider: str = "ollama"  # "ollama" or "anthropic"
-    model: str = "qwen3:8b"
+    provider: str = "ollama"  # "ollama", "apple_fm" or "anthropic"
+    model: str = "qwen3:8b"  # ignored by apple_fm (single on-device model)
     base_url: str = "http://localhost:11434"
     api_key: str | None = None  # anthropic only; falls back to ANTHROPIC_API_KEY
 

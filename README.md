@@ -117,6 +117,12 @@ extra with `uv sync --extra anthropic`, API key via `api_key` or
 `$ANTHROPIC_API_KEY`). The `LLMClient` protocol in `src/jobwatch/llm.py` is the
 seam for adding other providers.
 
+On Apple Silicon (macOS 26+), set `[llm] provider = "apple_fm"` to use Apple's
+on-device Foundation Models (install with `uv sync --extra apple-fm`; no API
+key, and `model` is ignored — there's a single system model). This provider
+uses the SDK's guided generation (`@fm.generable`), so the verdict is
+schema-constrained rather than parsed out of free-form JSON.
+
 ### Development
 
 ```bash
