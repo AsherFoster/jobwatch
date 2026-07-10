@@ -1,8 +1,9 @@
-import json
 import re
+from typing import Annotated
 
-import httpx2
 import structlog
+from ollama import AsyncClient
+from pydantic import BaseModel, Field
 
 from jobwatch.llm import Verdict
 from jobwatch.models import Job
@@ -21,65 +22,50 @@ def build_prompt(job: Job, criteria_text: str) -> str:
     )
 
 
+class OllamaVerdict(BaseModel):
+    reasoning: str
+
+    score: Annotated[int, Field(strict=True, ge=1, le=5)]
+
+
 class OllamaClient:
     def __init__(self, model: str, base_url: str = "http://localhost:11434") -> None:
+        self.client = AsyncClient(base_url)
         self.model = model
-        self._client = httpx2.AsyncClient(base_url=base_url, timeout=300.0)
 
-    async def complete(self, system: str, prompt: str) -> str:
-        response = await self._client.post(
-            "/api/chat",
-            json={
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt},
-                ],
-                "format": "json",
-                "stream": False,
-            },
-        )
-        if not response.is_success:
-            log.error(response.text)
-
-        response.raise_for_status()
-        return response.json()["message"]["content"]
-
-    SYSTEM_PROMPT = """\
+    async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
+        system_prompt = """
 You screen job postings for a job seeker. You are given their criteria and one job posting.
 Decide whether the posting is worth their time to review.
 
-Respond with ONLY a JSON object, no other text:
-{"matched": true or false, "score": 1-5, "reasoning": "one or two sentences"}
+1 - 2: not a match, many downsides and no redeeming qualities
+3: uncertain, doesn't appear to suit but may be worth a second look
+4 - 5: well suited, aligns well to the job seeker, with few downsides 
+        """
+        user_criteria = "# My criteria\n\n" + criteria_text
 
-score is how well the job fits the criteria:
-1 - hard no, completely different role
-2 - unlikely: has many drawbacks that make it unsuitable
-3 - uncertain, may or may not be suitable
-4 - matches some criteria and has some drawbacks
-5 - matches many criteria and has very few drawbacks
+        clean_description = re.sub(r"\n+", "\n", re.sub(r" +", " ", job.description))
+        job_details = f"""
+**{job.title}** at **{job.company}**, in **{job.location}**
 
-Err on the side of
-including: the job seeker would rather review a borderline posting than miss a real
-opportunity. When in doubt, or when the posting is vague, set matched to true. Only set
-matched to false when the posting clearly hits a negative criterion or is clearly
-irrelevant to the criteria."""
+--
 
-    async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
-        response = await self.complete(self.SYSTEM_PROMPT, build_prompt(job, criteria_text))
-        try:
-            match = re.search(r"\{.*}", response, re.DOTALL)
-            if not match:
-                raise ValueError(f"No JSON object in LLM response: {response[:200]!r}")
-            data = json.loads(match.group(0))
-        except (ValueError, KeyError, json.JSONDecodeError) as e:
-            log.error("Failed to parse LLM response", exc_info=e)
-            return Verdict(
-                matched=False, score=0, reasoning=f"LLM response unparseable: {response[:200]}"
-            )
+{clean_description}
+"""
+        response = await self.client.chat(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_criteria},
+                {"role": "user", "content": job_details},
+            ],
+            format=OllamaVerdict.model_json_schema(),
+        )
+
+        model_verdict = OllamaVerdict.model_validate(response.message.content)
 
         return Verdict(
-            matched=bool(data["matched"]),
-            score=max(0, min(5, int(data.get("score", 0)))),
-            reasoning=str(data.get("reasoning", "")),
+            score=model_verdict.score,
+            matched=model_verdict.score >= 4,
+            reasoning=model_verdict.reasoning,
         )
