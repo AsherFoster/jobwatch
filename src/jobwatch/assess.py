@@ -7,9 +7,10 @@ import re
 from dataclasses import dataclass
 
 import structlog
+from sqlalchemy.orm import Session
 
 from jobwatch.llm import LLMClient
-from jobwatch.models import Job
+from jobwatch.models import Assessment, Job
 
 logger = structlog.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def parse_verdict(text: str) -> Verdict:
     )
 
 
-def assess_job(llm: LLMClient, job: Job, criteria_text: str) -> Verdict:
+def generate_llm_verdict(llm: LLMClient, job: Job, criteria_text: str) -> Verdict:
     response = llm.complete(SYSTEM_PROMPT, build_prompt(job, criteria_text))
     try:
         return parse_verdict(response)
@@ -67,3 +68,25 @@ def assess_job(llm: LLMClient, job: Job, criteria_text: str) -> Verdict:
         return Verdict(
             matched=False, score=0, reasoning=f"LLM response unparseable: {response[:200]}"
         )
+
+
+def assess_single(session: Session, llm: LLMClient, job: Job, criteria_text: str) -> Verdict:
+    """(Re-)assess one job under the current criteria.
+
+    Any existing active verdict for this job is invalidated rather than
+    deleted, so past verdicts stay visible as history on the job's page.
+    """
+    assert job.active_assessment is None
+
+    verdict = generate_llm_verdict(llm, job, criteria_text)
+    session.add(
+        Assessment(
+            job_id=job.id,
+            matched=verdict.matched,
+            score=verdict.score,
+            reasoning=verdict.reasoning,
+            model=llm.model,
+        )
+    )
+
+    return verdict

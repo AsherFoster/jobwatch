@@ -7,7 +7,7 @@ from typing import Protocol
 import httpx
 import structlog
 
-from jobwatch.config import Config
+from jobwatch.config import Config, config
 from jobwatch.models import Job
 
 logger = structlog.getLogger(__name__)
@@ -45,7 +45,7 @@ class NullNotifier:
         logger.warning("No notifier configured; %d matches not announced", len(jobs))
 
 
-def make_notifier(config: Config) -> Notifier:
+def make_notifier() -> Notifier:
     if config.notify.discord is not None:
         return DiscordNotifier(config.notify.discord.webhook_url)
     return NullNotifier()

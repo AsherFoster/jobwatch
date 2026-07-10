@@ -5,26 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jobwatch.assess import Verdict, assess_job
+from jobwatch.assess import assess_single
 from jobwatch.config import config
 from jobwatch.criteria import get_criteria_text
 from jobwatch.llm import LLMClient
 from jobwatch.models import Assessment, Job, utcnow
-from jobwatch.notify import Notifier
+from jobwatch.notify import make_notifier
 from jobwatch.scraper import ScrapedJob, scrape_search
 from jobwatch.searches import get_searches
 
 logger = structlog.getLogger(__name__)
-
-
-@dataclass
-class PipelineResult:
-    new_jobs: int = 0
-    assessed: int = 0
-    notified: list[Job] = field(default_factory=list)
 
 
 def store_new_jobs(session: Session, search_name: str, scraped: list[ScrapedJob]) -> int:
@@ -71,30 +64,14 @@ def sync_jobs(session: Session) -> int:
     return new
 
 
-def assess_single(session: Session, llm: LLMClient, job: Job) -> Verdict:
-    """(Re-)assess one job under the current criteria.
-
-    Any existing active verdict for this job is invalidated rather than
-    deleted, so past verdicts stay visible as history on the job's page.
-    """
-    criteria_text = get_criteria_text(session)
-    session.execute(
-        update(Assessment)
-        .where(Assessment.job_id == job.id, Assessment.invalidated_at.is_(None))
-        .values(invalidated_at=utcnow())
-    )
-    verdict = assess_job(llm, job, criteria_text)
-    session.add(
-        Assessment(
-            job_id=job.id,
-            matched=verdict.matched,
-            score=verdict.score,
-            reasoning=verdict.reasoning,
-            model=config.llm.model,
+def get_unassessed_job(session: Session) -> Job | None:
+    return session.scalars(
+        select(Job)
+        .where(
+            Job.active_assessment.is_(None),
         )
-    )
-    session.commit()  # commit per job so a crash mid-batch loses nothing
-    return verdict
+        .order_by(Job.scraped_at)
+    ).first()
 
 
 def assess_pending(session: Session, llm: LLMClient) -> int:
@@ -108,24 +85,29 @@ def assess_pending(session: Session, llm: LLMClient) -> int:
     """
     criteria_text = get_criteria_text(session)
     if not criteria_text.strip():
-        logger.warning("Criteria text is empty; skipping assessment. Edit it at /criteria.")
+        logger.warning("Criteria text is empty; skipping assessment.")
         return 0
 
-    assessed_ids = select(Assessment.job_id).where(Assessment.invalidated_at.is_(None))
-    pending = session.scalars(select(Job).where(Job.id.not_in(assessed_ids))).all()
+    job = get_unassessed_job(session)
+    count = 0
 
-    for job in pending:
-        assess_single(session, llm, job)
-    return len(pending)
+    while job is not None:
+        assess_single(session, llm, job, criteria_text)
+        session.commit()
+
+        count += 1
+
+    return count
 
 
-def notify_new_matches(session: Session, notifier: Notifier) -> list[Job]:
+def notify_new_matches(session: Session) -> list[Job]:
     """Send a single notification for matched jobs that were never announced."""
+    notifier = make_notifier()
+
     matches = session.scalars(
         select(Job)
-        .join(Assessment)
+        .join(Assessment, Job.active_assessment)
         .where(
-            Assessment.invalidated_at.is_(None),
             Assessment.matched,
             Job.notified_at.is_(None),
         )
@@ -143,15 +125,7 @@ def notify_new_matches(session: Session, notifier: Notifier) -> list[Job]:
     return list(matches)
 
 
-def run_pipeline(session: Session, llm: LLMClient, notifier: Notifier) -> PipelineResult:
-    result = PipelineResult()
-    result.new_jobs = sync_jobs(session)
-    result.assessed = assess_pending(session, llm)
-    result.notified = notify_new_matches(session, notifier)
-    logger.info(
-        "Pipeline done: %d new jobs, %d assessed, %d notified",
-        result.new_jobs,
-        result.assessed,
-        len(result.notified),
-    )
-    return result
+def run_pipeline(session: Session, llm: LLMClient) -> None:
+    sync_jobs(session)
+    assess_pending(session, llm)
+    notify_new_matches(session)

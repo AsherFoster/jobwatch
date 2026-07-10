@@ -32,12 +32,11 @@ def worker() -> None:
     from jobwatch.db import session_maker
     from jobwatch.llm import make_llm_client
     from jobwatch.models import utcnow
-    from jobwatch.notify import make_notifier
     from jobwatch.pipeline import run_pipeline
 
     def pipeline_tick() -> None:
         with session_maker() as session:
-            run_pipeline(session, make_llm_client(config.llm), make_notifier(config))
+            run_pipeline(session, make_llm_client(config.llm))
 
     # Explicit UTC avoids tzlocal(), which fails on POSIX-style TZ values
     # (e.g. "CEST-2"); interval jobs don't need local time.

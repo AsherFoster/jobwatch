@@ -1,6 +1,6 @@
 import pytest
 
-from jobwatch.assess import assess_job, parse_verdict
+from jobwatch.assess import generate_llm_verdict, parse_verdict
 from jobwatch.models import Job
 
 
@@ -40,19 +40,19 @@ def test_parse_rejects_non_json():
         parse_verdict("I could not decide.")
 
 
-def test_assess_job_survives_garbage_response():
+def test_generate_llm_verdict_survives_garbage_response():
     class GarbageLLM:
         model = "test"
 
         def complete(self, system: str, prompt: str) -> str:
             return "not json at all"
 
-    verdict = assess_job(GarbageLLM(), make_job(), "criteria")
+    verdict = generate_llm_verdict(GarbageLLM(), make_job(), "criteria")
     assert verdict.matched is False
     assert "unparseable" in verdict.reasoning.lower()
 
 
-def test_assess_job_passes_criteria_and_description():
+def test_generate_llm_verdict_passes_criteria_and_description():
     captured = {}
 
     class RecordingLLM:
@@ -62,7 +62,7 @@ def test_assess_job_passes_criteria_and_description():
             captured["prompt"] = prompt
             return '{"matched": true, "score": 7, "reasoning": "ok"}'
 
-    verdict = assess_job(RecordingLLM(), make_job(), "Positives: python")
+    verdict = generate_llm_verdict(RecordingLLM(), make_job(), "Positives: python")
     assert verdict.matched is True
     assert "Positives: python" in captured["prompt"]
     assert "Python backend role" in captured["prompt"]

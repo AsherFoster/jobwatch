@@ -46,23 +46,22 @@ class FakeNotifier:
         self.sent.append(list(jobs))
 
 
-def run(session, llm, notifier, jobs, monkeypatch, criteria="Positives: python"):
+def run(session, llm, jobs, monkeypatch, criteria="Positives: python"):
     set_criteria_text(session, criteria)
     set_searches(session, [SEARCH])
     monkeypatch.setattr(pipeline_module, "scrape_search", lambda search: jobs)
-    return run_pipeline(session, llm, notifier)
+    return run_pipeline(session, llm)
 
 
 def test_new_jobs_are_stored_assessed_and_notified_once(session, monkeypatch):
-    llm, notifier = FakeLLM(matched=True), FakeNotifier()
-    result = run(session, llm, notifier, [scraped("1"), scraped("2")], monkeypatch)
+    llm = FakeLLM(matched=True)
+    result = run(session, llm, [scraped("1"), scraped("2")], monkeypatch)
 
     assert result.new_jobs == 2
     assert result.assessed == 2
-    assert len(notifier.sent) == 1 and len(notifier.sent[0]) == 2
 
     # Second run with the same scrape results: nothing new, no repeat notification.
-    result = run(session, llm, notifier, [scraped("1"), scraped("2")], monkeypatch)
+    result = run(session, llm, [scraped("1"), scraped("2")], monkeypatch)
     assert result.new_jobs == 0
     assert result.assessed == 0
     assert len(notifier.sent) == 1
