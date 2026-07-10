@@ -2,8 +2,8 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
 
+from jobwatch.db import make_engine
 from jobwatch.models import Base
 
 # this is the Alembic Config object, which provides
@@ -43,11 +43,11 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations against a live DB, using the URL from `_get_url()`."""
-    section = config.get_section(config.config_ini_section, {})
-    section["sqlalchemy.url"] = _get_url()
-    connectable = engine_from_config(section, prefix="sqlalchemy.", poolclass=pool.NullPool)
-    with connectable.connect() as connection:
+    """Run migrations against a live DB, reusing jobwatch's own engine setup
+    (`make_engine`: sqlite pragmas, dir creation) instead of building a
+    separate one from alembic.ini."""
+    engine = make_engine(_get_url())
+    with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()

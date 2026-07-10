@@ -5,13 +5,15 @@ The scrape/assess/notify pipeline runs in a separate process (`jobwatch worker`)
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from jobwatch.config import Config
 from jobwatch.criteria import get_criteria_text, set_criteria_text
@@ -23,31 +25,40 @@ from jobwatch.pipeline import assess_single
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
+def get_session(request: Request) -> Iterator[Session]:
+    """The DB dependency every route uses. `create_app` points this at real
+    sqlite; tests swap it via `app.dependency_overrides` to share their own
+    in-memory `session` fixture instead — no monkeypatching needed."""
+    with request.app.state.session_factory() as session:
+        yield session
+
+
+SessionDep = Annotated[Session, Depends(get_session)]
+
+
 def create_app(config: Config) -> FastAPI:
-    engine = make_engine(config.database_url)
-    session_factory = make_session_factory(engine)
     llm = make_llm_client(config.llm)
 
     app = FastAPI(title="jobwatch")
+    app.state.session_factory = make_session_factory(make_engine(config.database_url))
 
     @app.get("/", response_class=HTMLResponse)
-    def list_jobs(request: Request, show: str = "matched"):
-        with session_factory() as session:
-            query = (
-                select(Job)
-                .options(selectinload(Job.all_assessments), selectinload(Job.active_assessment))
-                .order_by(Job.scraped_at.desc())
-                .limit(500)
+    def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
+        query = (
+            select(Job)
+            .options(selectinload(Job.all_assessments), selectinload(Job.active_assessment))
+            .order_by(Job.scraped_at.desc())
+            .limit(500)
+        )
+        if show in ("matched", "unmatched"):
+            # Match on each job's current verdict, whichever criteria it was
+            # last evaluated against — editing the criteria doesn't clear
+            # this list, only reevaluating a job does.
+            query = query.join(Assessment).where(
+                Assessment.invalidated_at.is_(None),
+                Assessment.matched if show == "matched" else ~Assessment.matched,
             )
-            if show in ("matched", "unmatched"):
-                # Match on each job's current verdict, whichever criteria it was
-                # last evaluated against — editing the criteria doesn't clear
-                # this list, only reevaluating a job does.
-                query = query.join(Assessment).where(
-                    Assessment.invalidated_at.is_(None),
-                    Assessment.matched if show == "matched" else ~Assessment.matched,
-                )
-            jobs = session.scalars(query).unique().all()
+        jobs = session.scalars(query).unique().all()
         return templates.TemplateResponse(
             request,
             "jobs.html",
@@ -55,30 +66,27 @@ def create_app(config: Config) -> FastAPI:
         )
 
     @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-    def job_detail(request: Request, job_id: int):
-        with session_factory() as session:
-            job = session.get(
-                Job,
-                job_id,
-                options=[selectinload(Job.all_assessments), selectinload(Job.active_assessment)],
-            )
-            if job is None:
-                raise HTTPException(status_code=404)
+    def job_detail(request: Request, job_id: int, session: SessionDep):
+        job = session.get(
+            Job,
+            job_id,
+            options=[selectinload(Job.all_assessments), selectinload(Job.active_assessment)],
+        )
+        if job is None:
+            raise HTTPException(status_code=404)
         return templates.TemplateResponse(request, "job.html", {"job": job})
 
     @app.post("/jobs/{job_id}/reassess")
-    def reassess(job_id: int):
-        with session_factory() as session:
-            job = session.get(Job, job_id)
-            if job is None:
-                raise HTTPException(status_code=404)
-            assess_single(session, llm, config, job)
+    def reassess(job_id: int, session: SessionDep):
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404)
+        assess_single(session, llm, config, job)
         return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
     @app.get("/criteria", response_class=HTMLResponse)
-    def edit_criteria(request: Request, saved: bool = False):
-        with session_factory() as session:
-            text = get_criteria_text(session)
+    def edit_criteria(request: Request, session: SessionDep, saved: bool = False):
+        text = get_criteria_text(session)
         return templates.TemplateResponse(
             request,
             "criteria.html",
@@ -86,9 +94,8 @@ def create_app(config: Config) -> FastAPI:
         )
 
     @app.post("/criteria")
-    def save_criteria(text: str = Form("")):
-        with session_factory() as session:
-            set_criteria_text(session, text)
+    def save_criteria(session: SessionDep, text: str = Form("")):
+        set_criteria_text(session, text)
         return RedirectResponse("/criteria?saved=true", status_code=303)
 
     return app

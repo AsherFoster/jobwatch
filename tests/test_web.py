@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session, sessionmaker
 
-from jobwatch.config import Config, SearchConfig
+from jobwatch.config import Config
 from jobwatch.criteria import set_criteria_text
 from jobwatch.db import make_engine, make_session_factory
 from jobwatch.models import Job
-from jobwatch.web.app import create_app
+from jobwatch.web.app import create_app, get_session
 
 
 class FakeLLM:
@@ -20,17 +23,34 @@ class FakeLLM:
 
 
 @pytest.fixture
-def app_config(tmp_path) -> Config:
-    return Config(
-        database_url=f"sqlite:///{tmp_path / 'test.db'}",
-        searches=[SearchConfig(name="test", search_term="engineer", location="Denmark")],
-    )
+def session_factory() -> sessionmaker[Session]:
+    return make_session_factory(make_engine("sqlite:///:memory:"))
 
 
 @pytest.fixture
-def client(app_config, monkeypatch) -> TestClient:
+def session(session_factory: sessionmaker[Session]) -> Iterator[Session]:
+    """Shadows conftest's `session` fixture: web tests want blank criteria
+    (see test_criteria_page_starts_blank), not the pipeline tests' seeded text."""
+    with session_factory() as s:
+        yield s
+
+
+@pytest.fixture
+def client(
+    config: Config, session_factory: sessionmaker[Session], session: Session, monkeypatch
+) -> TestClient:
     monkeypatch.setattr("jobwatch.web.app.make_llm_client", lambda llm_config: FakeLLM())
-    return TestClient(create_app(app_config))
+    app = create_app(config)
+
+    def override_get_session() -> Iterator[Session]:
+        # A fresh session per request, same as get_session in production —
+        # sharing the `session` fixture's engine (same in-memory DB) so tests
+        # can seed/inspect data via `session` without stale cached relations.
+        with session_factory() as s:
+            yield s
+
+    app.dependency_overrides[get_session] = override_get_session
+    return TestClient(app)
 
 
 def test_criteria_page_starts_blank(client):
@@ -60,46 +80,42 @@ def test_job_list_renders(client):
     assert client.get("/?show=all").status_code == 200
 
 
-def _add_job(app_config) -> int:
-    session_factory = make_session_factory(make_engine(app_config.database_url))
-    with session_factory() as session:
-        job = Job(
-            site="linkedin",
-            external_id="1",
-            search_name="test",
-            title="Backend Engineer",
-            company="Acme",
-            location="Copenhagen",
-            url="https://example.com/1",
-            description="Python things",
-            raw="{}",
-        )
-        session.add(job)
-        session.commit()
-        return job.id
+def _add_job(session: Session) -> int:
+    job = Job(
+        site="linkedin",
+        external_id="1",
+        search_name="test",
+        title="Backend Engineer",
+        company="Acme",
+        location="Copenhagen",
+        url="https://example.com/1",
+        description="Python things",
+        raw="{}",
+    )
+    session.add(job)
+    session.commit()
+    return job.id
 
 
-def test_reassess_creates_new_verdict_and_keeps_old_as_history(client, app_config):
-    job_id = _add_job(app_config)
+def test_reassess_creates_new_verdict_and_keeps_old_as_history(client, session: Session):
+    job_id = _add_job(session)
 
     response = client.post(f"/jobs/{job_id}/reassess")
     assert response.status_code == 200  # followed the redirect to the job page
     assert "current" in response.text
 
-    session_factory = make_session_factory(make_engine(app_config.database_url))
-    with session_factory() as session:
-        set_criteria_text(session, "Completely different criteria")
+    set_criteria_text(session, "Completely different criteria")
 
     response = client.post(f"/jobs/{job_id}/reassess")
     assert response.status_code == 200
 
-    with session_factory() as session:
-        job = session.get(Job, job_id)
-        assert len(job.all_assessments) == 2
-        active = [a for a in job.all_assessments if a.invalidated_at is None]
-        assert len(active) == 1
-        invalidated = [a for a in job.all_assessments if a.invalidated_at is not None]
-        assert len(invalidated) == 1
+    job = session.get(Job, job_id)
+    assert job is not None
+    assert len(job.all_assessments) == 2
+    active = [a for a in job.all_assessments if a.invalidated_at is None]
+    assert len(active) == 1
+    invalidated = [a for a in job.all_assessments if a.invalidated_at is not None]
+    assert len(invalidated) == 1
 
 
 def test_reassess_missing_job_404s(client):
