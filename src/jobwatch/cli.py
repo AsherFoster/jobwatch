@@ -38,7 +38,7 @@ def worker() -> None:
     from jobwatch.pipeline import run_pipeline
 
     config = load_config()
-    session_factory = make_session_factory(make_engine())
+    session_factory = make_session_factory(make_engine(config.database_url))
 
     def pipeline_tick() -> None:
         with session_factory() as session:
@@ -65,7 +65,7 @@ def sync_jobs() -> None:
     from jobwatch.pipeline import sync_jobs as run_sync
 
     config = load_config()
-    session_factory = make_session_factory(make_engine())
+    session_factory = make_session_factory(make_engine(config.database_url))
     with session_factory() as session:
         new = run_sync(session, config)
     click.echo(f"{new} new jobs")
@@ -88,6 +88,7 @@ def assess_jobs(job_id: int | None) -> None:
 
     config = load_config()
     llm = make_llm_client(config.llm)
+    session_factory = make_session_factory(make_engine(config.database_url))
     with session_factory() as session:
         if job_id is not None:
             job = session.get(Job, job_id)

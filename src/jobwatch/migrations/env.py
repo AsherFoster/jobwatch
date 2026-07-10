@@ -1,8 +1,8 @@
-import os
 from logging.config import fileConfig
 
 from alembic import context
 
+from jobwatch.config import load_config
 from jobwatch.db import make_engine
 from jobwatch.models import Base
 
@@ -20,13 +20,8 @@ target_metadata = Base.metadata
 
 def _get_url() -> str:
     """jobwatch already owns a database URL (config.toml / $JOBWATCH_CONFIG);
-    reuse it instead of duplicating it in alembic.ini. Override with
-    `-x config=path/to/config.toml`, or by setting `sqlalchemy.url` directly
-    in alembic.ini."""
-    from jobwatch.config import DEFAULT_CONFIG_PATH, load_config
-
-    config_path = os.environ.get("JOBWATCH_CONFIG") or DEFAULT_CONFIG_PATH
-    return load_config(config_path).database_url
+    reuse it instead of duplicating it in alembic.ini."""
+    return load_config().database_url
 
 
 def run_migrations_offline() -> None:
