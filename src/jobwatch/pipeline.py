@@ -73,7 +73,7 @@ def get_unassessed_job(session: Session) -> Job | None:
     ).first()
 
 
-def assess_pending(session: Session, llm: LLMClient) -> int:
+async def assess_pending(session: Session, llm: LLMClient) -> int:
     """Assess every job that has no active verdict (never assessed, or invalidated).
 
     Editing the criteria does NOT invalidate existing verdicts, so it does NOT
@@ -91,7 +91,7 @@ def assess_pending(session: Session, llm: LLMClient) -> int:
     count = 0
 
     while job is not None:
-        assess_single(session, llm, job, criteria_text)
+        await assess_single(session, llm, job, criteria_text)
         session.commit()
 
         count += 1
@@ -125,7 +125,7 @@ def notify_new_matches(session: Session) -> list[Job]:
     return list(matches)
 
 
-def run_pipeline(session: Session, llm: LLMClient) -> None:
+async def run_pipeline(session: Session, llm: LLMClient) -> None:
     sync_jobs(session)
-    assess_pending(session, llm)
+    await assess_pending(session, llm)
     notify_new_matches(session)

@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from jobwatch.criteria import set_criteria_text
+from jobwatch.llm import Verdict
 from jobwatch.models import Job
 from jobwatch.search_jobs import SearchConfig
 from jobwatch.searches import get_searches, set_searches
@@ -18,13 +19,13 @@ from jobwatch.web.app import app, get_session
 class FakeLLM:
     model = "fake"
 
-    def complete(self, system: str, prompt: str) -> str:
-        return '{"matched": true, "score": 5, "reasoning": "good fit"}'
+    async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
+        return Verdict(score=5, matched=True, reasoning="good fit")
 
 
 @pytest.fixture
 def client(session: Session, monkeypatch) -> TestClient:
-    monkeypatch.setattr("jobwatch.web.app.make_llm_client", lambda llm_config: FakeLLM())
+    monkeypatch.setattr("jobwatch.web.app.make_llm_client", lambda: FakeLLM())
 
     def override_get_session() -> Iterator[Session]:
         yield session

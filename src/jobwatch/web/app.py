@@ -14,7 +14,6 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from jobwatch.config import config
 from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
@@ -69,7 +68,7 @@ def job_detail(request: Request, job_id: int, session: SessionDep):
 
 
 @app.post("/jobs/{job_id}/reassess")
-def reassess(job_id: int, session: SessionDep):
+async def reassess(job_id: int, session: SessionDep):
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(status_code=404)
@@ -78,8 +77,8 @@ def reassess(job_id: int, session: SessionDep):
         assessment.invalidated_at = utcnow()
         session.expire(job, ["active_assessment"])
 
-    llm = make_llm_client(config.llm)
-    assess_single(
+    llm = make_llm_client()
+    await assess_single(
         session,
         llm,
         job,

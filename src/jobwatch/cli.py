@@ -2,6 +2,7 @@
 long-running modes; `sync-jobs` and `assess-jobs` run individual pipeline steps."""
 
 from __future__ import annotations
+import asyncio
 
 import click
 import structlog
@@ -14,16 +15,6 @@ log = structlog.get_logger()
 @click.group(help="Scrape LinkedIn jobs, assess with an LLM, notify on matches.")
 def app() -> None:
     pass
-
-
-@app.command()
-def serve() -> None:
-    """Run the web UI (no background pipeline; run `jobwatch worker` alongside)."""
-    import uvicorn
-
-    from jobwatch.web.app import app
-
-    uvicorn.run(app)
 
 
 @app.command()
@@ -41,7 +32,7 @@ def worker() -> None:
 
     def pipeline_tick() -> None:
         with session_maker() as session:
-            run_pipeline(session, make_llm_client(config.llm))
+            asyncio.run(run_pipeline(session, make_llm_client()))
 
     # Explicit UTC avoids tzlocal(), which fails on POSIX-style TZ values
     # (e.g. "CEST-2"); interval jobs don't need local time.
@@ -79,13 +70,12 @@ def assess_jobs(job_id: int | None) -> None:
     jobs — run this with a JOB_ID (or use the web UI's "Reevaluate" button) to
     refresh a specific job on demand.
     """
-    from jobwatch.config import config
     from jobwatch.db import session_maker
     from jobwatch.llm import make_llm_client
     from jobwatch.models import Job
     from jobwatch.pipeline import assess_pending, assess_single
 
-    llm = make_llm_client(config.llm)
+    llm = make_llm_client()
     with session_maker() as session:
         if job_id is not None:
             criteria_text = get_criteria_text(session)
@@ -94,13 +84,13 @@ def assess_jobs(job_id: int | None) -> None:
             job = session.get(Job, job_id)
             if job is None:
                 raise click.ClickException(f"No job with id {job_id}")
-            verdict = assess_single(session, llm, job, criteria_text)
+            verdict = asyncio.run(assess_single(session, llm, job, criteria_text))
             click.echo(
                 f"Job {job_id}: {'matched' if verdict.matched else 'not matched'} "
                 f"(score {verdict.score}/5) — {verdict.reasoning}"
             )
         else:
-            count = assess_pending(session, llm)
+            count = asyncio.run(assess_pending(session, llm))
             click.echo(f"Assessed {count} jobs")
 
 

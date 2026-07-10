@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from sqlalchemy import select
 
 import jobwatch.pipeline as pipeline_module
+from jobwatch.assess import Verdict
 from jobwatch.criteria import set_criteria_text
 from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.notify import NullNotifier
@@ -40,9 +43,9 @@ class FakeLLM:
         self.matched = matched
         self.calls = 0
 
-    def complete(self, system: str, prompt: str) -> str:
+    async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
         self.calls += 1
-        return f'{{"matched": {str(self.matched).lower()}, "score": 7, "reasoning": "test"}}'
+        return Verdict(matched=self.matched, score=4, reasoning="test")
 
 
 def run(session, llm, jobs, monkeypatch, criteria="Positives: python"):
@@ -50,7 +53,7 @@ def run(session, llm, jobs, monkeypatch, criteria="Positives: python"):
     set_searches(session, [SEARCH])
     monkeypatch.setattr(pipeline_module, "JOB_SOURCES", [fake_source(lambda search: jobs)])
     monkeypatch.setattr(pipeline_module, "make_notifier", NullNotifier)
-    run_pipeline(session, llm)
+    asyncio.run(run_pipeline(session, llm))
 
 
 def all_jobs(session) -> list[Job]:
@@ -110,7 +113,7 @@ def test_reevaluating_a_job_invalidates_its_old_verdict_instead_of_deleting_it(
     # Reevaluation: the caller invalidates the old verdict, then assesses anew.
     first.invalidated_at = utcnow()
     session.commit()
-    assess_single(session, llm, job, "Completely new criteria")
+    asyncio.run(assess_single(session, llm, job, "Completely new criteria"))
     session.commit()
 
     assert len(job.all_assessments) == 2  # old verdict kept, not deleted
@@ -135,7 +138,7 @@ def test_scrape_failure_does_not_abort_pipeline(session, monkeypatch):
 
     set_searches(session, [SEARCH])
     monkeypatch.setattr(pipeline_module, "JOB_SOURCES", [fake_source(boom)])
-    run_pipeline(session, FakeLLM())
+    asyncio.run(run_pipeline(session, FakeLLM()))
     assert all_jobs(session) == []
 
 
@@ -144,5 +147,5 @@ def test_no_configured_searches_scrapes_nothing(session, monkeypatch):
         raise AssertionError("no source should be searched")
 
     monkeypatch.setattr(pipeline_module, "JOB_SOURCES", [fake_source(boom)])
-    run_pipeline(session, FakeLLM())
+    asyncio.run(run_pipeline(session, FakeLLM()))
     assert all_jobs(session) == []
