@@ -6,6 +6,8 @@ from jobwatch.models import Job
 
 @fm.generable("Score of how well this job suits the job seeker")
 class FMVerdict:
+    reasoning: str = fm.guide("1 - 2 sentences explaining the score")
+
     score: int = fm.guide(
         """
         1 - 2: not a match, many downsides and no redeeming qualities
@@ -14,7 +16,6 @@ class FMVerdict:
         """,
         range=(1, 5),
     )
-    reasoning: str = fm.guide("1 - 2 sentences explaining the score")
 
 
 class AppleFMClient:

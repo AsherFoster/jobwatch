@@ -23,6 +23,7 @@ async def assess_single(session: Session, llm: LLMClient, job: Job, criteria_tex
 
     with structlog.contextvars.bound_contextvars(job_id=job.id):
         verdict = await llm.assess_job(job, criteria_text)
+        log.info("Assessed job", score=verdict.score)
     session.add(
         Assessment(
             job_id=job.id,
