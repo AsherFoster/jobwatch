@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from jobwatch.searches import SearchConfig, get_searches, set_searches
+from jobwatch.search_jobs import SearchConfig
+from jobwatch.searches import get_searches, set_searches
 
 
 def test_unconfigured_returns_empty(session):

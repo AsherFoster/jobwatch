@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 from jobwatch.assess import assess_single
 from jobwatch.config import config
 from jobwatch.criteria import get_criteria_text
+from jobwatch.job_sources import JOB_SOURCES
 from jobwatch.llm import LLMClient
 from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.notify import make_notifier
-from jobwatch.scraper import ScrapedJob, scrape_search
+from jobwatch.search_jobs import ScrapedJob
 from jobwatch.searches import get_searches
 
 logger = structlog.getLogger(__name__)
@@ -47,18 +48,22 @@ def store_new_jobs(session: Session, search_name: str, scraped: list[ScrapedJob]
 
 
 def sync_jobs(session: Session) -> int:
-    """Scrape every configured search and store unseen jobs; returns how many were new."""
+    """Run every configured search against every source and store unseen jobs;
+    returns how many were new."""
     searches = get_searches(session)
     if not searches:
         logger.warning("No searches configured; nothing to scrape. See searches.py.")
     new = 0
     for search in searches:
-        try:
-            scraped = scrape_search(search)
-        except Exception:
-            logger.exception("Scrape failed for search %r; continuing", search.name)
-            continue
-        new += store_new_jobs(session, search.name, scraped)
+        for source in JOB_SOURCES:
+            try:
+                scraped = list(source.search_function(search))
+            except Exception:
+                logger.exception(
+                    "Search %r failed on source %r; continuing", search.name, source.id
+                )
+                continue
+            new += store_new_jobs(session, search.name, scraped)
     return new
 
 
