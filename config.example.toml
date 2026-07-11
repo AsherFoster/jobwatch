@@ -7,9 +7,16 @@
 [llm]
 provider = "ollama"    # or "anthropic" / "gemini" (requires: uv sync --extra anthropic / --extra gemini)
 model = "qwen3:8b"
+
+[llm.ollama]
 # From inside Docker, the Mac host's Ollama is reachable at host.docker.internal:
 base_url = "http://host.docker.internal:11434"
-# api_key = "sk-ant-..."  # anthropic/gemini only; defaults to $ANTHROPIC_API_KEY / $GEMINI_API_KEY
+
+# [llm.anthropic]
+# api_key = "sk-ant-..."  # defaults to $ANTHROPIC_API_KEY
+
+# [llm.gemini]
+# api_key = "AIza..."     # defaults to $GEMINI_API_KEY
 
 [notify.discord]
 webhook_url = "https://discord.com/api/webhooks/CHANGE-ME"
