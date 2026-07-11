@@ -16,7 +16,7 @@ DEFAULT_CONFIG_PATH = Path("config.toml")
 
 
 class OllamaConfig(BaseModel):
-    base_url: str = "http://localhost:11434"
+    base_url: str
 
 
 class AnthropicConfig(BaseModel):
@@ -46,11 +46,11 @@ class ScheduleConfig(BaseModel):
 
 class WebConfig(BaseModel):
     # Used to build links in notifications; set to how *you* reach the UI.
-    base_url: str = "http://localhost:8000"
+    base_url: str
 
 
 class Config(BaseModel):
-    database_url: str = "sqlite:///data/jobwatch.db"
+    database_url: str
     llm: LLMConfig = LLMConfig()
     ollama: OllamaConfig = OllamaConfig()
     anthropic: AnthropicConfig = AnthropicConfig()

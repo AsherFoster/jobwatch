@@ -1,21 +1,18 @@
-# Copy to config.toml and edit. config.toml is gitignored (it holds your webhook URL).
-# Every setting has a default, so the file itself is optional.
-# Searches live in the database, not here — see README.
+# Copy to config.toml and edit. Contains secrets, do not commit
 
-# database_url = "sqlite:///data/jobwatch.db"  # any SQLAlchemy URL works
+database_url = "sqlite:///data/jobwatch.db"
 
 [llm]
-provider = "ollama"    # or "anthropic" / "gemini" (requires: uv sync --extra anthropic / --extra gemini)
+provider = "ollama"    # options: anthropic, gemini, ollama, apple_fm
 model = "qwen3:8b"
 
 [ollama]
-# From inside Docker, the Mac host's Ollama is reachable at host.docker.internal:
-base_url = "http://host.docker.internal:11434"
+# base_url = "http://host.docker.internal:11434"
 
-# [anthropic]
+[anthropic]
 # api_key = "sk-ant-..."  # defaults to $ANTHROPIC_API_KEY
 
-# [gemini]
+[gemini]
 # api_key = "AIza..."     # defaults to $GEMINI_API_KEY
 
 [notify.discord]
