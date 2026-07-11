@@ -36,7 +36,7 @@ Code should be written in Python, using modern tools like uv, ty, and ruff.
 ```bash
 cp config.example.toml config.toml   # then edit: webhook URL, LLM
 uv sync
-uv run jobwatch serve                # web UI
+uv run fastapi dev                   # web UI (app path comes from pyproject.toml)
 uv run jobwatch worker               # scheduled pipeline (separate process)
 ```
 
@@ -70,7 +70,7 @@ into the LLM prompt as examples, but nothing uses them for that yet.
 ### CLI
 
 ```bash
-uv run jobwatch serve              # web UI (no pipeline)
+uv run fastapi dev                 # web UI (no pipeline); Docker uses `fastapi run`
 uv run jobwatch worker             # scrape → assess → notify on a schedule, forever
 uv run jobwatch sync-jobs          # pull new jobs from LinkedIn (no assessment)
 uv run jobwatch assess-jobs        # assess stored jobs

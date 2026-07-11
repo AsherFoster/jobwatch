@@ -19,4 +19,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
 EXPOSE 8000
-CMD ["uv", "run", "--no-sync", "jobwatch", "serve"]
+CMD ["uv", "run", "--no-sync", "fastapi", "run"]
