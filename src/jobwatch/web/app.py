@@ -29,6 +29,16 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
+def get_job(job_id: int, session: SessionDep) -> Job:
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404)
+    return job
+
+
+JobDep = Annotated[Job, Depends(get_job)]
+
+
 app = FastAPI(title="jobwatch")
 
 
@@ -63,29 +73,8 @@ def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-def job_detail(request: Request, job_id: int, session: SessionDep):
-    job = session.get(
-        Job,
-        job_id,
-        options=[
-            selectinload(Job.all_assessments),
-            selectinload(Job.active_assessment),
-            selectinload(Job.user_state),
-        ],
-    )
-    if job is None:
-        raise HTTPException(status_code=404)
+def job_detail(request: Request, job: JobDep):
     return templates.TemplateResponse(request, "job.html", {"job": job})
-
-
-def get_job(job_id: int, session: SessionDep) -> Job:
-    job = session.get(Job, job_id)
-    if job is None:
-        raise HTTPException(status_code=404)
-    return job
-
-
-JobDep = Annotated[Job, Depends(get_job)]
 
 
 @app.put("/jobs/{job_id}/rating")
