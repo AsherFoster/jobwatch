@@ -11,7 +11,7 @@ from jobwatch.config import config
 from jobwatch.criteria import get_criteria_text
 from jobwatch.job_sources import JOB_SOURCES
 from jobwatch.llm import LLMClient
-from jobwatch.models import Assessment, Job, utcnow
+from jobwatch.models import MATCHED_MIN_SCORE, Assessment, Job, utcnow
 from jobwatch.notify import make_notifier
 from jobwatch.search_jobs import ScrapedJob
 from jobwatch.searches import get_searches
@@ -108,7 +108,7 @@ def notify_new_matches(session: Session) -> list[Job]:
         select(Job)
         .join(Assessment, Job.active_assessment)
         .where(
-            Assessment.matched,
+            Assessment.score >= MATCHED_MIN_SCORE,
             Job.notified_at.is_(None),
         )
         .order_by(Job.scraped_at)

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, selectinload
 from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
-from jobwatch.models import Assessment, Job, UserJobState, utcnow
+from jobwatch.models import MATCHED_MIN_SCORE, Assessment, Job, UserJobState, utcnow
 from jobwatch.pipeline import assess_single
 from jobwatch.search_jobs import SearchConfig
 from jobwatch.searches import get_searches, set_searches
@@ -60,7 +60,9 @@ def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
         # this list, only reevaluating a job does.
         query = query.join(Assessment).where(
             Assessment.invalidated_at.is_(None),
-            Assessment.matched if show == "matched" else ~Assessment.matched,
+            Assessment.score >= MATCHED_MIN_SCORE
+            if show == "matched"
+            else Assessment.score < MATCHED_MIN_SCORE,
         )
     elif show == "saved":
         query = query.join(Job.user_state).where(UserJobState.bookmarked_at.is_not(None))

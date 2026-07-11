@@ -1,4 +1,4 @@
-"""Turn a job description + user criteria into a matched/not-matched verdict."""
+"""Turn a job description + user criteria into a scored verdict."""
 
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ async def assess_single(session: Session, llm: LLMClient, job: Job, criteria_tex
     session.add(
         Assessment(
             job_id=job.id,
-            matched=verdict.matched,
             score=verdict.score,
             reasoning=verdict.reasoning,
             model=llm.model,

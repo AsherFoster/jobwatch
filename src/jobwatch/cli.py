@@ -87,10 +87,7 @@ def assess_jobs(job_id: int | None) -> None:
             if job is None:
                 raise click.ClickException(f"No job with id {job_id}")
             verdict = asyncio.run(assess_single(session, llm, job, criteria_text))
-            click.echo(
-                f"Job {job_id}: {'matched' if verdict.matched else 'not matched'} "
-                f"(score {verdict.score}/5) — {verdict.reasoning}"
-            )
+            click.echo(f"Job {job_id} scored {verdict.score}/5\n\n{verdict.reasoning}")
         else:
             count = asyncio.run(assess_pending(session, llm))
             click.echo(f"Assessed {count} jobs")

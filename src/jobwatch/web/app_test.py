@@ -21,7 +21,7 @@ class FakeLLM:
     model = "fake"
 
     async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
-        return Verdict(score=5, matched=True, reasoning="good fit")
+        return Verdict(score=5, reasoning="good fit")
 
 
 @pytest.fixture

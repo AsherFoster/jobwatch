@@ -66,6 +66,5 @@ Decide whether the posting is worth their time to review.
 
         return Verdict(
             score=model_verdict.score,
-            matched=model_verdict.score >= 4,
             reasoning=model_verdict.reasoning,
         )

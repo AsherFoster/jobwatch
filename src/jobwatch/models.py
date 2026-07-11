@@ -12,6 +12,10 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+# Assessments scoring at least this many stars count as a match.
+MATCHED_MIN_SCORE = 4
+
+
 class Base(DeclarativeBase):
     type_annotation_map = {
         str: Text,
@@ -89,7 +93,6 @@ class Assessment(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
-    matched: Mapped[bool]
     score: Mapped[int]  # 1-5 stars (0 = response was unparseable)
     reasoning: Mapped[str]
     model: Mapped[str]
@@ -100,6 +103,10 @@ class Assessment(Base):
     invalidated_at: Mapped[datetime | None]
 
     job: Mapped[Job] = relationship(back_populates="all_assessments")
+
+    @property
+    def matched(self) -> bool:
+        return self.score >= MATCHED_MIN_SCORE
 
     __table_args__ = (
         # At most one *active* verdict per job at a time; past verdicts stay

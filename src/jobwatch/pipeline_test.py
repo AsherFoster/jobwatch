@@ -39,13 +39,13 @@ def scraped(external_id: str, title: str = "Backend Engineer") -> ScrapedJob:
 class FakeLLM:
     model = "fake"
 
-    def __init__(self, matched: bool = True):
-        self.matched = matched
+    def __init__(self, score: int = 4):
+        self.score = score
         self.calls = 0
 
     async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
         self.calls += 1
-        return Verdict(matched=self.matched, score=4, reasoning="test")
+        return Verdict(score=self.score, reasoning="test")
 
 
 def run(session, llm, jobs, monkeypatch, criteria="Positives: python"):
@@ -61,7 +61,7 @@ def all_jobs(session) -> list[Job]:
 
 
 def test_new_jobs_are_stored_assessed_and_notified_once(session, monkeypatch):
-    llm = FakeLLM(matched=True)
+    llm = FakeLLM(score=4)
     run(session, llm, [scraped("1"), scraped("2")], monkeypatch)
 
     jobs = all_jobs(session)
@@ -78,7 +78,7 @@ def test_new_jobs_are_stored_assessed_and_notified_once(session, monkeypatch):
 
 
 def test_unmatched_jobs_do_not_notify(session, monkeypatch):
-    run(session, FakeLLM(matched=False), [scraped("1")], monkeypatch)
+    run(session, FakeLLM(score=2), [scraped("1")], monkeypatch)
 
     job = session.scalars(select(Job)).one()
     assert job.active_assessment is not None
@@ -89,7 +89,7 @@ def test_unmatched_jobs_do_not_notify(session, monkeypatch):
 def test_criteria_change_does_not_reassess_the_backlog(session, monkeypatch):
     """Editing the criteria only affects newly-scraped jobs; already-assessed
     jobs keep their old verdict until explicitly reevaluated (on-demand)."""
-    llm = FakeLLM(matched=True)
+    llm = FakeLLM()
     run(session, llm, [scraped("1")], monkeypatch)
     assert llm.calls == 1
 
@@ -103,7 +103,7 @@ def test_criteria_change_does_not_reassess_the_backlog(session, monkeypatch):
 def test_reevaluating_a_job_invalidates_its_old_verdict_instead_of_deleting_it(
     session, monkeypatch
 ):
-    llm = FakeLLM(matched=True)
+    llm = FakeLLM()
     run(session, llm, [scraped("1")], monkeypatch)
     job = session.scalars(select(Job)).one()
     first = job.active_assessment

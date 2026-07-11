@@ -51,6 +51,5 @@ Their criteria:
 
         return Verdict(
             score=response.score,
-            matched=response.score >= 4,
             reasoning=response.reasoning,
         )

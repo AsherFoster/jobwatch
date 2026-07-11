@@ -2,14 +2,17 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from jobwatch.config import config
-from jobwatch.models import Job
+from jobwatch.models import MATCHED_MIN_SCORE, Job
 
 
 @dataclass
 class Verdict:
-    matched: bool
     score: int
     reasoning: str
+
+    # @property
+    # def matched(self) -> bool:
+    #     return self.score >= MATCHED_MIN_SCORE
 
 
 class LLMClient(Protocol):
