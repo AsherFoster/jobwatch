@@ -1,12 +1,8 @@
-{# A button that sends `method` to `url` via fetch and reloads on success.
-   HTML forms only speak GET/POST, so PUT/DELETE endpoints need this. #}
-{% macro action_button(method, url, label, body=None, cls=None, title=None) -%}
-<button type="button"
-  {%- if cls %} class="{{ cls }}"{% endif %}
-  {%- if title %} title="{{ title }}"{% endif %}
-  {# single-quoted attribute: tojson escapes ' but not " #}
-  onclick='fetch("{{ url }}", {method: "{{ method }}"{% if body %}, body: new URLSearchParams({{ body | tojson }}){% endif %}})
-    .then(r => r.ok ? location.reload() : alert(`${r.status} ${r.statusText}`))'>
-  {{- label -}}
-</button>
+{# HTML forms only speak GET/POST; this onclick attribute lets a button send
+   `method` via fetch instead. The URL comes from the button's native
+   formaction attribute, and its name/value (if any) become the body — just
+   like a submit button: <button formaction="/x" {{ action("PUT") }}>. #}
+{% macro action(method) -%}
+  onclick='fetch(this.formAction, {method: "{{ method }}", body: this.name ? new URLSearchParams({[this.name]: this.value}) : null})
+    .then(r => r.ok ? location.reload() : alert(`${r.status} ${r.statusText}`))'
 {%- endmacro %}

@@ -90,27 +90,31 @@ JobDep = Annotated[Job, Depends(get_job)]
 
 @app.put("/jobs/{job_id}/rating")
 def rate_job(job: JobDep, session: SessionDep, rating: Annotated[int, Form(ge=1, le=5)]):
-    set_job_rating(session, job, rating)
+    set_job_rating(job, rating)
+    session.commit()
     return Response(status_code=204)
 
 
 @app.delete("/jobs/{job_id}/rating")
 def clear_rating(job: JobDep, session: SessionDep):
-    set_job_rating(session, job, None)
+    set_job_rating(job, None)
+    session.commit()
     return Response(status_code=204)
 
 
 @app.put("/jobs/{job_id}/bookmark")
 @app.delete("/jobs/{job_id}/bookmark")
 def bookmark_job(request: Request, job: JobDep, session: SessionDep):
-    set_job_bookmarked(session, job, request.method == "PUT")
+    set_job_bookmarked(job, request.method == "PUT")
+    session.commit()
     return Response(status_code=204)
 
 
 @app.put("/jobs/{job_id}/applied")
 @app.delete("/jobs/{job_id}/applied")
 def mark_applied(request: Request, job: JobDep, session: SessionDep):
-    set_job_applied(session, job, request.method == "PUT")
+    set_job_applied(job, request.method == "PUT")
+    session.commit()
     return Response(status_code=204)
 
 
