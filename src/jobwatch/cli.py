@@ -1,5 +1,6 @@
-"""CLI entry points: `serve` (web UI) and `worker` (scheduled pipeline) are the
-long-running modes; `sync-jobs` and `assess-jobs` run individual pipeline steps."""
+"""CLI entry points: `worker` (scheduled pipeline) is the long-running mode;
+`sync-jobs` and `assess-jobs` run individual pipeline steps. The web UI is
+served separately with `fastapi dev` (or uvicorn in Docker)."""
 
 from __future__ import annotations
 

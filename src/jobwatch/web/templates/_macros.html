@@ -1,0 +1,8 @@
+{# HTML forms only speak GET/POST; this onclick attribute lets a button send
+   `method` via fetch instead. The URL comes from the button's native
+   formaction attribute, and its name/value (if any) become the body — just
+   like a submit button: <button formaction="/x" {{ action("PUT") }}>. #}
+{% macro action(method) -%}
+  onclick='fetch(this.formAction, {method: "{{ method }}", body: this.name ? new URLSearchParams({[this.name]: this.value}) : null})
+    .then(r => r.ok ? location.reload() : alert(`${r.status} ${r.statusText}`))'
+{%- endmacro %}

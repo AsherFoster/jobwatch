@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import action %}
 {% block title %}{{ job.title }} — jobwatch{% endblock %}
 {% block content %}
 <h1>{{ job.title }}</h1>
@@ -10,6 +11,31 @@
   Search: {{ job.search_name }} · Scraped {{ job.scraped_at.strftime("%Y-%m-%d %H:%M") }}
   {% if job.posted_at %} · Posted {{ job.posted_at.strftime("%Y-%m-%d") }}{% endif %}
 </p>
+
+{% set state = job.user_state %}
+{% set rating = state.rating if state else None %}
+<div class="user-actions">
+  <span class="star-form">
+    {% for n in range(1, 6) %}
+    <button formaction="/jobs/{{ job.id }}/rating" name="rating" value="{{ n }}" title="Rate {{ n }}/5" {{ action("PUT") }}>
+      {{- '★' if rating and n <= rating else '☆' -}}
+    </button>
+    {% endfor %}
+    {% if rating %}
+    <button formaction="/jobs/{{ job.id }}/rating" class="muted" {{ action("DELETE") }}>clear</button>
+    {% endif %}
+  </span>
+  {% if state and state.bookmarked_at %}
+  <button formaction="/jobs/{{ job.id }}/bookmark" {{ action("DELETE") }}>Saved ✓</button>
+  {% else %}
+  <button formaction="/jobs/{{ job.id }}/bookmark" {{ action("PUT") }}>Save</button>
+  {% endif %}
+  {% if state and state.applied_at %}
+  <button formaction="/jobs/{{ job.id }}/applied" {{ action("DELETE") }}>Applied {{ state.applied_at.strftime("%Y-%m-%d") }} ✓</button>
+  {% else %}
+  <button formaction="/jobs/{{ job.id }}/applied" {{ action("PUT") }}>Mark applied</button>
+  {% endif %}
+</div>
 
 {% set current = job.active_assessment %}
 <h2>Assessments</h2>

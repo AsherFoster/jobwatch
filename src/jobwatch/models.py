@@ -50,9 +50,28 @@ class Job(Base):
         viewonly=True,
         uselist=False,
     )
+    # The user's rating/bookmark/applied state, if they've touched this job.
+    user_state: Mapped[UserJobState | None] = relationship(back_populates="job")
 
     def latest_assessment(self) -> Assessment | None:
         return self.all_assessments[-1] if self.all_assessments else None
+
+
+class UserJobState(Base):
+    """The user's own take on a job: mutable current values, unlike the
+    append-only assessment history. Single-user for now — gains a user_id
+    (and a (user_id, job_id) unique) if multiple users arrive."""
+
+    __tablename__ = "user_job_state"
+    __table_args__ = (UniqueConstraint("job_id", name="uq_user_job_state_job_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
+    rating: Mapped[int | None]  # 1-5 stars; null = unrated
+    bookmarked_at: Mapped[datetime | None]
+    applied_at: Mapped[datetime | None]
+
+    job: Mapped[Job] = relationship(back_populates="user_state")
 
 
 class Setting(Base):

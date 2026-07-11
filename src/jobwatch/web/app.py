@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -17,15 +17,26 @@ from sqlalchemy.orm import Session, selectinload
 from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
-from jobwatch.models import Assessment, Job, utcnow
+from jobwatch.models import Assessment, Job, UserJobState, utcnow
 from jobwatch.pipeline import assess_single
 from jobwatch.search_jobs import SearchConfig
 from jobwatch.searches import get_searches, set_searches
+from jobwatch.user_state import set_job_applied, set_job_bookmarked, set_job_rating
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
+
+
+def get_job(job_id: int, session: SessionDep) -> Job:
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404)
+    return job
+
+
+JobDep = Annotated[Job, Depends(get_job)]
 
 
 app = FastAPI(title="jobwatch")
@@ -35,7 +46,11 @@ app = FastAPI(title="jobwatch")
 def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
     query = (
         select(Job)
-        .options(selectinload(Job.all_assessments), selectinload(Job.active_assessment))
+        .options(
+            selectinload(Job.all_assessments),
+            selectinload(Job.active_assessment),
+            selectinload(Job.user_state),
+        )
         .order_by(Job.scraped_at.desc())
         .limit(500)
     )
@@ -47,6 +62,8 @@ def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
             Assessment.invalidated_at.is_(None),
             Assessment.matched if show == "matched" else ~Assessment.matched,
         )
+    elif show == "saved":
+        query = query.join(Job.user_state).where(UserJobState.bookmarked_at.is_not(None))
     jobs = session.scalars(query).unique().all()
     return templates.TemplateResponse(
         request,
@@ -56,23 +73,42 @@ def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-def job_detail(request: Request, job_id: int, session: SessionDep):
-    job = session.get(
-        Job,
-        job_id,
-        options=[selectinload(Job.all_assessments), selectinload(Job.active_assessment)],
-    )
-    if job is None:
-        raise HTTPException(status_code=404)
+def job_detail(request: Request, job: JobDep):
     return templates.TemplateResponse(request, "job.html", {"job": job})
 
 
-@app.post("/jobs/{job_id}/reassess")
-async def reassess(job_id: int, session: SessionDep):
-    job = session.get(Job, job_id)
-    if job is None:
-        raise HTTPException(status_code=404)
+@app.put("/jobs/{job_id}/rating")
+def rate_job(job: JobDep, session: SessionDep, rating: Annotated[int, Form(ge=1, le=5)]):
+    set_job_rating(job, rating)
+    session.commit()
+    return Response(status_code=204)
 
+
+@app.delete("/jobs/{job_id}/rating")
+def clear_rating(job: JobDep, session: SessionDep):
+    set_job_rating(job, None)
+    session.commit()
+    return Response(status_code=204)
+
+
+@app.put("/jobs/{job_id}/bookmark")
+@app.delete("/jobs/{job_id}/bookmark")
+def bookmark_job(request: Request, job: JobDep, session: SessionDep):
+    set_job_bookmarked(job, request.method == "PUT")
+    session.commit()
+    return Response(status_code=204)
+
+
+@app.put("/jobs/{job_id}/applied")
+@app.delete("/jobs/{job_id}/applied")
+def mark_applied(request: Request, job: JobDep, session: SessionDep):
+    set_job_applied(job, request.method == "PUT")
+    session.commit()
+    return Response(status_code=204)
+
+
+@app.post("/jobs/{job_id}/reassess")
+async def reassess(job: JobDep, session: SessionDep):
     if assessment := job.active_assessment:
         assessment.invalidated_at = utcnow()
         session.expire(job, ["active_assessment"])
@@ -86,7 +122,7 @@ async def reassess(job_id: int, session: SessionDep):
     )
 
     session.commit()
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+    return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
 
 @app.get("/settings", response_class=HTMLResponse)

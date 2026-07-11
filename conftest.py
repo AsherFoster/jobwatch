@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from sqlalchemy import StaticPool, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from jobwatch.models import Base
+
+# Test modules are imported after this file, and jobwatch.config loads its file
+# at import time — config.toml (the default) is gitignored so may not exist.
+# Keep conftest's own imports free of anything that pulls in jobwatch.config.
+os.environ.setdefault("JOBWATCH_CONFIG", str(Path(__file__).parent / "config.test.toml"))
 
 
 @pytest.fixture

@@ -36,7 +36,7 @@ Code should be written in Python, using modern tools like uv, ty, and ruff.
 ```bash
 cp config.example.toml config.toml   # then edit: webhook URL, LLM
 uv sync
-uv run jobwatch serve                # web UI
+uv run fastapi dev                   # web UI (app path comes from pyproject.toml)
 uv run jobwatch worker               # scheduled pipeline (separate process)
 ```
 
@@ -57,10 +57,20 @@ holding a JSON list — see `src/jobwatch/searches.py`), not in config.toml, and
 are managed on the same **Settings** tab. On a database that predates this,
 migration 0003 copies them out of config.toml.
 
+### Your own ratings, bookmarks, and applied marks
+
+Each job's page has controls for *your* take, separate from the LLM's verdict:
+a 1-5 star rating, a **Save** bookmark (saved jobs get their own tab), and a
+**Mark applied** toggle. These live in the `user_job_state` table
+(`UserJobState` in `models.py`) — one mutable row per job, unlike the
+append-only assessment history. On a database that predates this, run
+migration 0005. Ratings are stored with an eye to eventually feeding them back
+into the LLM prompt as examples, but nothing uses them for that yet.
+
 ### CLI
 
 ```bash
-uv run jobwatch serve              # web UI (no pipeline)
+uv run fastapi dev                 # web UI (no pipeline); Docker serves it with uvicorn
 uv run jobwatch worker             # scrape → assess → notify on a schedule, forever
 uv run jobwatch sync-jobs          # pull new jobs from LinkedIn (no assessment)
 uv run jobwatch assess-jobs        # assess stored jobs
