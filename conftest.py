@@ -10,11 +10,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from jobwatch.models import Base
 
-
-def pytest_configure(config: pytest.Config) -> None:
-    # Runs before test modules are imported; jobwatch.config loads its file at
-    # import time, and config.toml (the default) is gitignored so may not exist.
-    os.environ.setdefault("JOBWATCH_CONFIG", str(Path(__file__).parent / "config.test.toml"))
+# Test modules are imported after this file, and jobwatch.config loads its file
+# at import time — config.toml (the default) is gitignored so may not exist.
+# Keep conftest's own imports free of anything that pulls in jobwatch.config.
+os.environ.setdefault("JOBWATCH_CONFIG", str(Path(__file__).parent / "config.test.toml"))
 
 
 @pytest.fixture
