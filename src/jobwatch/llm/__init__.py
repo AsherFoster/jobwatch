@@ -32,5 +32,9 @@ def make_llm_client() -> LLMClient:
             from jobwatch.llm.anthropic import AnthropicClient
 
             return AnthropicClient(model=config.llm.model, api_key=config.llm.api_key)
+        case "gemini":
+            from jobwatch.llm.gemini import GeminiClient
+
+            return GeminiClient(model=config.llm.model, api_key=config.llm.api_key)
         case _:
             raise ValueError(f"Unknown LLM provider: {config.llm.provider!r}")

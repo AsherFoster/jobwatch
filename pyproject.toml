@@ -30,6 +30,9 @@ anthropic = [
 apple-fm = [
     "apple-fm-sdk>=0.2.1",
 ]
+gemini = [
+    "google-genai>=2.11.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]

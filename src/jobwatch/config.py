@@ -16,10 +16,11 @@ DEFAULT_CONFIG_PATH = Path("config.toml")
 
 
 class LLMConfig(BaseModel):
-    provider: str = "ollama"  # "ollama", "apple_fm" or "anthropic"
+    provider: str = "ollama"  # "ollama", "apple_fm", "anthropic" or "gemini"
     model: str = "qwen3:8b"  # ignored by apple_fm (single on-device model)
     base_url: str = "http://localhost:11434"
-    api_key: str | None = None  # anthropic only; falls back to ANTHROPIC_API_KEY
+    # anthropic/gemini only; falls back to ANTHROPIC_API_KEY / GEMINI_API_KEY
+    api_key: str | None = None
 
 
 class DiscordConfig(BaseModel):
