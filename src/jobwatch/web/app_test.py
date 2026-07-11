@@ -6,11 +6,12 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from jobwatch.criteria import set_criteria_text
 from jobwatch.llm import Verdict
-from jobwatch.models import Job
+from jobwatch.models import Job, UserJobState
 from jobwatch.search_jobs import SearchConfig
 from jobwatch.searches import get_searches, set_searches
 from jobwatch.web.app import app, get_session
@@ -142,15 +143,15 @@ def test_job_list_renders(client):
     assert client.get("/?show=all").status_code == 200
 
 
-def _add_job(session: Session) -> int:
+def _add_job(session: Session, external_id: str = "1", title: str = "Backend Engineer") -> int:
     job = Job(
         site="linkedin",
-        external_id="1",
+        external_id=external_id,
         search_name="test",
-        title="Backend Engineer",
+        title=title,
         company="Acme",
         location="Copenhagen",
-        url="https://example.com/1",
+        url=f"https://example.com/{external_id}",
         description="Python things",
         raw="{}",
     )
@@ -184,3 +185,74 @@ def test_reassess_creates_new_verdict_and_keeps_old_as_history(client, session: 
 
 def test_reassess_missing_job_404s(client):
     assert client.post("/jobs/999/reassess").status_code == 404
+
+
+def _user_states(session: Session) -> list[UserJobState]:
+    return list(session.scalars(select(UserJobState)))
+
+
+def test_rating_persists_and_updates_in_place(client, session: Session):
+    job_id = _add_job(session)
+
+    response = client.post(f"/jobs/{job_id}/rating", data={"rating": "4"})
+    assert response.status_code == 200  # followed the redirect to the job page
+    assert response.text.count("★") == 4
+
+    client.post(f"/jobs/{job_id}/rating", data={"rating": "2"})
+
+    states = _user_states(session)
+    assert len(states) == 1
+    assert states[0].job_id == job_id
+    assert states[0].rating == 2
+
+
+def test_rating_zero_clears(client, session: Session):
+    job_id = _add_job(session)
+    client.post(f"/jobs/{job_id}/rating", data={"rating": "3"})
+    client.post(f"/jobs/{job_id}/rating", data={"rating": "0"})
+
+    assert _user_states(session)[0].rating is None
+
+
+def test_rating_out_of_range_is_rejected(client, session: Session):
+    job_id = _add_job(session)
+    assert client.post(f"/jobs/{job_id}/rating", data={"rating": "6"}).status_code == 422
+    assert _user_states(session) == []
+
+
+def test_bookmark_toggles(client, session: Session):
+    job_id = _add_job(session)
+
+    client.post(f"/jobs/{job_id}/bookmark")
+    assert _user_states(session)[0].bookmarked_at is not None
+
+    client.post(f"/jobs/{job_id}/bookmark")
+    assert _user_states(session)[0].bookmarked_at is None
+
+
+def test_applied_toggles(client, session: Session):
+    job_id = _add_job(session)
+
+    response = client.post(f"/jobs/{job_id}/applied")
+    assert "Applied" in response.text
+    assert _user_states(session)[0].applied_at is not None
+
+    client.post(f"/jobs/{job_id}/applied")
+    assert _user_states(session)[0].applied_at is None
+
+
+def test_saved_tab_lists_only_bookmarked_jobs(client, session: Session):
+    bookmarked_id = _add_job(session, external_id="1", title="Backend Engineer")
+    _add_job(session, external_id="2", title="Frontend Engineer")
+    client.post(f"/jobs/{bookmarked_id}/bookmark")
+
+    response = client.get("/?show=saved")
+    assert response.status_code == 200
+    assert "Backend Engineer" in response.text
+    assert "Frontend Engineer" not in response.text
+
+
+def test_state_endpoints_404_on_missing_job(client):
+    assert client.post("/jobs/999/rating", data={"rating": "3"}).status_code == 404
+    assert client.post("/jobs/999/bookmark").status_code == 404
+    assert client.post("/jobs/999/applied").status_code == 404

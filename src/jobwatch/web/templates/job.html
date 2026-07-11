@@ -11,6 +11,31 @@
   {% if job.posted_at %} · Posted {{ job.posted_at.strftime("%Y-%m-%d") }}{% endif %}
 </p>
 
+{% set state = job.user_state %}
+{% set rating = state.rating if state else None %}
+<div class="user-actions">
+  <form method="post" action="/jobs/{{ job.id }}/rating" class="star-form">
+    {% for n in range(1, 6) %}
+    <button type="submit" name="rating" value="{{ n }}" title="Rate {{ n }}/5">
+      {{- '★' if rating and n <= rating else '☆' -}}
+    </button>
+    {% endfor %}
+    {% if rating %}
+    <button type="submit" name="rating" value="0" class="muted">clear</button>
+    {% endif %}
+  </form>
+  <form method="post" action="/jobs/{{ job.id }}/bookmark">
+    <button type="submit">{{ 'Saved ✓' if state and state.bookmarked_at else 'Save' }}</button>
+  </form>
+  <form method="post" action="/jobs/{{ job.id }}/applied">
+    {% if state and state.applied_at %}
+    <button type="submit">Applied {{ state.applied_at.strftime("%Y-%m-%d") }} ✓</button>
+    {% else %}
+    <button type="submit">Mark applied</button>
+    {% endif %}
+  </form>
+</div>
+
 {% set current = job.active_assessment %}
 <h2>Assessments</h2>
 <form method="post" action="/jobs/{{ job.id }}/reassess">

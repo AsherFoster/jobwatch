@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, selectinload
 from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
-from jobwatch.models import Assessment, Job, utcnow
+from jobwatch.models import Assessment, Job, UserJobState, utcnow
 from jobwatch.pipeline import assess_single
 from jobwatch.search_jobs import SearchConfig
 from jobwatch.searches import get_searches, set_searches
@@ -35,7 +35,11 @@ app = FastAPI(title="jobwatch")
 def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
     query = (
         select(Job)
-        .options(selectinload(Job.all_assessments), selectinload(Job.active_assessment))
+        .options(
+            selectinload(Job.all_assessments),
+            selectinload(Job.active_assessment),
+            selectinload(Job.user_state),
+        )
         .order_by(Job.scraped_at.desc())
         .limit(500)
     )
@@ -47,6 +51,8 @@ def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
             Assessment.invalidated_at.is_(None),
             Assessment.matched if show == "matched" else ~Assessment.matched,
         )
+    elif show == "saved":
+        query = query.join(Job.user_state).where(UserJobState.bookmarked_at.is_not(None))
     jobs = session.scalars(query).unique().all()
     return templates.TemplateResponse(
         request,
@@ -60,11 +66,52 @@ def job_detail(request: Request, job_id: int, session: SessionDep):
     job = session.get(
         Job,
         job_id,
-        options=[selectinload(Job.all_assessments), selectinload(Job.active_assessment)],
+        options=[
+            selectinload(Job.all_assessments),
+            selectinload(Job.active_assessment),
+            selectinload(Job.user_state),
+        ],
     )
     if job is None:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(request, "job.html", {"job": job})
+
+
+def get_user_state(session: Session, job_id: int) -> UserJobState:
+    """The user-state row for a job, created on first touch."""
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404)
+    state = job.user_state
+    if state is None:
+        state = UserJobState(job_id=job.id)
+        job.user_state = state
+    return state
+
+
+@app.post("/jobs/{job_id}/rating")
+def rate_job(job_id: int, session: SessionDep, rating: Annotated[int, Form(ge=0, le=5)]):
+    """Set the user's 1-5 star rating; 0 clears it."""
+    state = get_user_state(session, job_id)
+    state.rating = rating or None
+    session.commit()
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+
+@app.post("/jobs/{job_id}/bookmark")
+def toggle_bookmark(job_id: int, session: SessionDep):
+    state = get_user_state(session, job_id)
+    state.bookmarked_at = None if state.bookmarked_at else utcnow()
+    session.commit()
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+
+@app.post("/jobs/{job_id}/applied")
+def toggle_applied(job_id: int, session: SessionDep):
+    state = get_user_state(session, job_id)
+    state.applied_at = None if state.applied_at else utcnow()
+    session.commit()
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
 @app.post("/jobs/{job_id}/reassess")
