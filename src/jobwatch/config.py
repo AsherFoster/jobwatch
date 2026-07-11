@@ -51,13 +51,13 @@ class WebConfig(BaseModel):
 
 class Config(BaseModel):
     database_url: str
-    llm: LLMConfig = LLMConfig()
-    ollama: OllamaConfig = OllamaConfig()
-    anthropic: AnthropicConfig = AnthropicConfig()
-    gemini: GeminiConfig = GeminiConfig()
+    llm: LLMConfig
+    ollama: OllamaConfig | None = None
+    anthropic: AnthropicConfig | None = None
+    gemini: GeminiConfig | None = None
     notify: NotifyConfig = NotifyConfig()
-    schedule: ScheduleConfig = ScheduleConfig()
-    web: WebConfig = WebConfig()
+    schedule: ScheduleConfig
+    web: WebConfig
 
 
 path = os.environ.get("JOBWATCH_CONFIG") or DEFAULT_CONFIG_PATH

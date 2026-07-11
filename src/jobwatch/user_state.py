@@ -8,13 +8,14 @@ caller's job.
 from __future__ import annotations
 
 from jobwatch.models import Job, UserJobState, utcnow
+from jobwatch.typing import unwrap
 
 
 def _state(job: Job) -> UserJobState:
     """The job's user-state row, created on first touch."""
     if job.user_state is None:
         job.user_state = UserJobState(job_id=job.id)
-    return job.user_state
+    return unwrap(job.user_state)
 
 
 def set_job_rating(job: Job, rating: int | None) -> None:

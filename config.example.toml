@@ -6,13 +6,13 @@ database_url = "sqlite:///data/jobwatch.db"
 provider = "ollama"    # options: anthropic, gemini, ollama, apple_fm
 model = "qwen3:8b"
 
-[ollama]
+# [ollama]
 # base_url = "http://host.docker.internal:11434"
 
-[anthropic]
+# [anthropic]
 # api_key = "sk-ant-..."  # defaults to $ANTHROPIC_API_KEY
 
-[gemini]
+# [gemini]
 # api_key = "AIza..."     # defaults to $GEMINI_API_KEY
 
 [notify.discord]
