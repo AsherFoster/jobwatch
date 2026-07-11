@@ -104,12 +104,12 @@ means most non-trivial changes need `op.batch_alter_table(...)`.
 ### Swapping the LLM
 
 Set `[llm] provider = "anthropic"` and `model = "claude-haiku-4-5"` (install the
-extra with `uv sync --extra anthropic`, API key via `[llm.anthropic] api_key` or
+extra with `uv sync --extra anthropic`, API key via `[anthropic] api_key` or
 `$ANTHROPIC_API_KEY`). The `LLMClient` protocol in `src/jobwatch/llm.py` is the
 seam for adding other providers.
 
 For Gemini, set `[llm] provider = "gemini"` and `model = "gemini-2.5-flash"`
-(install the extra with `uv sync --extra gemini`, API key via `[llm.gemini]
+(install the extra with `uv sync --extra gemini`, API key via `[gemini]
 api_key` or `$GEMINI_API_KEY`). This provider uses the Interactions API with a
 JSON-schema response format, so the verdict is schema-constrained.
 

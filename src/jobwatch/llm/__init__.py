@@ -23,7 +23,7 @@ def make_llm_client() -> LLMClient:
         case "ollama":
             from jobwatch.llm.ollama import OllamaClient
 
-            return OllamaClient(model=config.llm.model, base_url=config.llm.ollama.base_url)
+            return OllamaClient(model=config.llm.model, base_url=config.ollama.base_url)
         case "apple_fm":
             from jobwatch.llm.apple_fm import AppleFMClient
 
@@ -31,10 +31,10 @@ def make_llm_client() -> LLMClient:
         case "anthropic":
             from jobwatch.llm.anthropic import AnthropicClient
 
-            return AnthropicClient(model=config.llm.model, api_key=config.llm.anthropic.api_key)
+            return AnthropicClient(model=config.llm.model, api_key=config.anthropic.api_key)
         case "gemini":
             from jobwatch.llm.gemini import GeminiClient
 
-            return GeminiClient(model=config.llm.model, api_key=config.llm.gemini.api_key)
+            return GeminiClient(model=config.llm.model, api_key=config.gemini.api_key)
         case _:
             raise ValueError(f"Unknown LLM provider: {config.llm.provider!r}")

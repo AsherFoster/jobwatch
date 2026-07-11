@@ -30,9 +30,6 @@ class GeminiConfig(BaseModel):
 class LLMConfig(BaseModel):
     provider: str = "ollama"  # "ollama", "apple_fm", "anthropic" or "gemini"
     model: str = "qwen3:8b"  # ignored by apple_fm (single on-device model)
-    ollama: OllamaConfig = OllamaConfig()
-    anthropic: AnthropicConfig = AnthropicConfig()
-    gemini: GeminiConfig = GeminiConfig()
 
 
 class DiscordConfig(BaseModel):
@@ -55,6 +52,9 @@ class WebConfig(BaseModel):
 class Config(BaseModel):
     database_url: str = "sqlite:///data/jobwatch.db"
     llm: LLMConfig = LLMConfig()
+    ollama: OllamaConfig = OllamaConfig()
+    anthropic: AnthropicConfig = AnthropicConfig()
+    gemini: GeminiConfig = GeminiConfig()
     notify: NotifyConfig = NotifyConfig()
     schedule: ScheduleConfig = ScheduleConfig()
     web: WebConfig = WebConfig()

@@ -8,7 +8,7 @@
 provider = "ollama"    # or "anthropic" / "gemini" (requires: uv sync --extra anthropic / --extra gemini)
 model = "qwen3:8b"
 
-[llm.ollama]
+[ollama]
 # From inside Docker, the Mac host's Ollama is reachable at host.docker.internal:
 base_url = "http://host.docker.internal:11434"
 

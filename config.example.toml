@@ -8,14 +8,14 @@
 provider = "ollama"    # or "anthropic" / "gemini" (requires: uv sync --extra anthropic / --extra gemini)
 model = "qwen3:8b"
 
-[llm.ollama]
+[ollama]
 # From inside Docker, the Mac host's Ollama is reachable at host.docker.internal:
 base_url = "http://host.docker.internal:11434"
 
-# [llm.anthropic]
+# [anthropic]
 # api_key = "sk-ant-..."  # defaults to $ANTHROPIC_API_KEY
 
-# [llm.gemini]
+# [gemini]
 # api_key = "AIza..."     # defaults to $GEMINI_API_KEY
 
 [notify.discord]
