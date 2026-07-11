@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -21,6 +21,7 @@ from jobwatch.models import Assessment, Job, UserJobState, utcnow
 from jobwatch.pipeline import assess_single
 from jobwatch.search_jobs import SearchConfig
 from jobwatch.searches import get_searches, set_searches
+from jobwatch.user_state import set_job_applied, set_job_bookmarked, set_job_rating
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -77,49 +78,44 @@ def job_detail(request: Request, job_id: int, session: SessionDep):
     return templates.TemplateResponse(request, "job.html", {"job": job})
 
 
-def get_user_state(session: Session, job_id: int) -> UserJobState:
-    """The user-state row for a job, created on first touch."""
+def get_job(job_id: int, session: SessionDep) -> Job:
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(status_code=404)
-    state = job.user_state
-    if state is None:
-        state = UserJobState(job_id=job.id)
-        job.user_state = state
-    return state
+    return job
 
 
-@app.post("/jobs/{job_id}/rating")
-def rate_job(job_id: int, session: SessionDep, rating: Annotated[int, Form(ge=0, le=5)]):
-    """Set the user's 1-5 star rating; 0 clears it."""
-    state = get_user_state(session, job_id)
-    state.rating = rating or None
-    session.commit()
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+JobDep = Annotated[Job, Depends(get_job)]
 
 
-@app.post("/jobs/{job_id}/bookmark")
-def toggle_bookmark(job_id: int, session: SessionDep):
-    state = get_user_state(session, job_id)
-    state.bookmarked_at = None if state.bookmarked_at else utcnow()
-    session.commit()
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+@app.put("/jobs/{job_id}/rating")
+def rate_job(job: JobDep, session: SessionDep, rating: Annotated[int, Form(ge=1, le=5)]):
+    set_job_rating(session, job, rating)
+    return Response(status_code=204)
 
 
-@app.post("/jobs/{job_id}/applied")
-def toggle_applied(job_id: int, session: SessionDep):
-    state = get_user_state(session, job_id)
-    state.applied_at = None if state.applied_at else utcnow()
-    session.commit()
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+@app.delete("/jobs/{job_id}/rating")
+def clear_rating(job: JobDep, session: SessionDep):
+    set_job_rating(session, job, None)
+    return Response(status_code=204)
+
+
+@app.put("/jobs/{job_id}/bookmark")
+@app.delete("/jobs/{job_id}/bookmark")
+def bookmark_job(request: Request, job: JobDep, session: SessionDep):
+    set_job_bookmarked(session, job, request.method == "PUT")
+    return Response(status_code=204)
+
+
+@app.put("/jobs/{job_id}/applied")
+@app.delete("/jobs/{job_id}/applied")
+def mark_applied(request: Request, job: JobDep, session: SessionDep):
+    set_job_applied(session, job, request.method == "PUT")
+    return Response(status_code=204)
 
 
 @app.post("/jobs/{job_id}/reassess")
-async def reassess(job_id: int, session: SessionDep):
-    job = session.get(Job, job_id)
-    if job is None:
-        raise HTTPException(status_code=404)
-
+async def reassess(job: JobDep, session: SessionDep):
     if assessment := job.active_assessment:
         assessment.invalidated_at = utcnow()
         session.expire(job, ["active_assessment"])
@@ -133,7 +129,7 @@ async def reassess(job_id: int, session: SessionDep):
     )
 
     session.commit()
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+    return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
 
 @app.get("/settings", response_class=HTMLResponse)

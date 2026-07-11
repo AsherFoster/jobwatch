@@ -194,11 +194,11 @@ def _user_states(session: Session) -> list[UserJobState]:
 def test_rating_persists_and_updates_in_place(client, session: Session):
     job_id = _add_job(session)
 
-    response = client.post(f"/jobs/{job_id}/rating", data={"rating": "4"})
-    assert response.status_code == 200  # followed the redirect to the job page
-    assert response.text.count("★") == 4
+    response = client.put(f"/jobs/{job_id}/rating", data={"rating": "4"})
+    assert response.status_code == 204
+    assert client.get(f"/jobs/{job_id}").text.count("★") == 4
 
-    client.post(f"/jobs/{job_id}/rating", data={"rating": "2"})
+    client.put(f"/jobs/{job_id}/rating", data={"rating": "2"})
 
     states = _user_states(session)
     assert len(states) == 1
@@ -206,45 +206,61 @@ def test_rating_persists_and_updates_in_place(client, session: Session):
     assert states[0].rating == 2
 
 
-def test_rating_zero_clears(client, session: Session):
+def test_rating_delete_clears(client, session: Session):
     job_id = _add_job(session)
-    client.post(f"/jobs/{job_id}/rating", data={"rating": "3"})
-    client.post(f"/jobs/{job_id}/rating", data={"rating": "0"})
+    client.put(f"/jobs/{job_id}/rating", data={"rating": "3"})
+    client.delete(f"/jobs/{job_id}/rating")
 
     assert _user_states(session)[0].rating is None
 
 
 def test_rating_out_of_range_is_rejected(client, session: Session):
     job_id = _add_job(session)
-    assert client.post(f"/jobs/{job_id}/rating", data={"rating": "6"}).status_code == 422
+    assert client.put(f"/jobs/{job_id}/rating", data={"rating": "6"}).status_code == 422
+    assert client.put(f"/jobs/{job_id}/rating", data={"rating": "0"}).status_code == 422
     assert _user_states(session) == []
 
 
-def test_bookmark_toggles(client, session: Session):
+def test_bookmark_set_and_clear(client, session: Session):
     job_id = _add_job(session)
 
-    client.post(f"/jobs/{job_id}/bookmark")
+    assert client.put(f"/jobs/{job_id}/bookmark").status_code == 204
     assert _user_states(session)[0].bookmarked_at is not None
 
-    client.post(f"/jobs/{job_id}/bookmark")
+    assert client.delete(f"/jobs/{job_id}/bookmark").status_code == 204
     assert _user_states(session)[0].bookmarked_at is None
 
 
-def test_applied_toggles(client, session: Session):
+def test_bookmark_is_idempotent(client, session: Session):
+    # A double-clicked Save button PUTs twice: the job stays bookmarked and
+    # keeps the first click's timestamp.
     job_id = _add_job(session)
 
-    response = client.post(f"/jobs/{job_id}/applied")
-    assert "Applied" in response.text
+    client.put(f"/jobs/{job_id}/bookmark")
+    first = _user_states(session)[0].bookmarked_at
+
+    client.put(f"/jobs/{job_id}/bookmark")
+    assert _user_states(session)[0].bookmarked_at == first
+
+
+def test_applied_set_and_clear(client, session: Session):
+    job_id = _add_job(session)
+
+    client.put(f"/jobs/{job_id}/applied")
+    assert _user_states(session)[0].applied_at is not None
+    assert "Applied" in client.get(f"/jobs/{job_id}").text
+
+    client.put(f"/jobs/{job_id}/applied")
     assert _user_states(session)[0].applied_at is not None
 
-    client.post(f"/jobs/{job_id}/applied")
+    client.delete(f"/jobs/{job_id}/applied")
     assert _user_states(session)[0].applied_at is None
 
 
 def test_saved_tab_lists_only_bookmarked_jobs(client, session: Session):
     bookmarked_id = _add_job(session, external_id="1", title="Backend Engineer")
     _add_job(session, external_id="2", title="Frontend Engineer")
-    client.post(f"/jobs/{bookmarked_id}/bookmark")
+    client.put(f"/jobs/{bookmarked_id}/bookmark")
 
     response = client.get("/?show=saved")
     assert response.status_code == 200
@@ -253,6 +269,7 @@ def test_saved_tab_lists_only_bookmarked_jobs(client, session: Session):
 
 
 def test_state_endpoints_404_on_missing_job(client):
-    assert client.post("/jobs/999/rating", data={"rating": "3"}).status_code == 404
-    assert client.post("/jobs/999/bookmark").status_code == 404
-    assert client.post("/jobs/999/applied").status_code == 404
+    assert client.put("/jobs/999/rating", data={"rating": "3"}).status_code == 404
+    assert client.delete("/jobs/999/rating").status_code == 404
+    assert client.put("/jobs/999/bookmark").status_code == 404
+    assert client.delete("/jobs/999/applied").status_code == 404
