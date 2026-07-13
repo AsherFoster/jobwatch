@@ -3,25 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from pathlib import Path
 
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import Connection, create_engine, event, text
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from jobwatch.config import config
-from jobwatch.models import Base
-
-
-def init_db(connection: Connection) -> None:
-    connection.execute(text("PRAGMA journal_mode=WAL"))
-
-    Base.metadata.create_all(connection)
-
-    alembic_cfg = Config(Path(__file__).parent.parent.parent / "alembic.ini")
-    alembic_cfg.attributes["connection"] = connection
-    command.stamp(alembic_cfg, "heads")
 
 
 engine = create_engine(config.database_url)

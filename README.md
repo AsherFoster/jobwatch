@@ -53,9 +53,8 @@ The criteria text is edited on the **Settings** tab (`/settings`); it lives in
 the database and starts blank — there's no config.toml seed for it.
 
 The searches also live in the database (a `settings` row named `searches`
-holding a JSON list — see `src/jobwatch/searches.py`), not in config.toml, and
-are managed on the same **Settings** tab. On a database that predates this,
-migration 0003 copies them out of config.toml.
+holding a JSON list — see `src/jobwatch/searches.py`), and are managed on the
+same **Settings** tab.
 
 ### Your own ratings, bookmarks, and applied marks
 
@@ -63,8 +62,7 @@ Each job's page has controls for *your* take, separate from the LLM's verdict:
 a 1-5 star rating, a **Save** bookmark (saved jobs get their own tab), and a
 **Mark applied** toggle. These live in the `user_job_state` table
 (`UserJobState` in `models.py`) — one mutable row per job, unlike the
-append-only assessment history. On a database that predates this, run
-migration 0005. Ratings are stored with an eye to eventually feeding them back
+append-only assessment history. Ratings are stored with an eye to eventually feeding them back
 into the LLM prompt as examples, but nothing uses them for that yet.
 
 ### CLI
@@ -91,25 +89,7 @@ re-ping you about jobs you've seen.
 
 ### Database schema changes
 
-A brand new database is created straight from `src/jobwatch/models.py` (via
-`Base.metadata.create_all()` on first run) — no migration involved. Alembic
-(`src/jobwatch/migrations/`) only comes in when a schema change needs to be
-applied to a database that already exists, since `create_all()` can add new
-tables but won't alter existing ones. It's run manually, not automatically on
-startup:
-
-```bash
-uv run alembic upgrade head    # apply pending migrations to your deployed DB
-```
-
-This picks up the same `config.toml` (or `JOBWATCH_CONFIG`) jobwatch itself
-reads. There's no "baseline" migration recreating table history — `models.py`
-+ `create_all()` already covers a fresh database, so each migration here only
-needs to describe the delta for a database that predates it.
-
-To add a schema change: edit `models.py`, then write a migration by hand
-(`uv run alembic revision -m "..."`) — sqlite's limited `ALTER TABLE` support
-means most non-trivial changes need `op.batch_alter_table(...)`.
+See `migrations` skill
 
 ### Swapping the LLM
 

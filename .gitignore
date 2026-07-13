@@ -15,4 +15,5 @@ data/
 
 
 .idea
-.claude
+.claude/worktrees
+.claude/settings.json
