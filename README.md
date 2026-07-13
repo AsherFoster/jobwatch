@@ -52,9 +52,10 @@ tabs for auditing. Jobs and every LLM verdict are stored in `data/jobwatch.db`.
 The criteria text is edited on the **Settings** tab (`/settings`); it lives in
 the database and starts blank — there's no config.toml seed for it.
 
-The searches also live in the database (a `settings` row named `searches`
-holding a JSON list — see `src/jobwatch/searches.py`), and are managed on the
-same **Settings** tab.
+The searches also live in the database (one `user_searches` row per search —
+see the `UserSearch` model), and are managed on the same **Settings** tab.
+Each search is just a term and a location: sources pull as many results as
+the job board allows, looking back as far as the search's last found job.
 
 ### Your own ratings, bookmarks, and applied marks
 

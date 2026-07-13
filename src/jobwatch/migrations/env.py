@@ -25,6 +25,14 @@ def run_migrations_online() -> None:
     (`make_engine`: sqlite pragmas, dir creation) instead of building a
     separate one from alembic.ini."""
     with engine.connect() as connection:
+        if connection.dialect.name == "sqlite":
+            # Batch (table-recreate) migrations must drop tables that other
+            # tables reference, which the engine's foreign_keys pragma would
+            # reject. Enforcement returns with the next connection.
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            # End the autobegun transaction (the pragma is connection-level
+            # and survives) so alembic begins — and commits — its own.
+            connection.rollback()
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()

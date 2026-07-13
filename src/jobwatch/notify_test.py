@@ -12,7 +12,6 @@ def make_jobs(n: int) -> list[Job]:
         Job(
             site="linkedin",
             external_id=str(i),
-            search_name="test",
             title=f"Job {i}",
             company="Acme",
             location="Copenhagen",

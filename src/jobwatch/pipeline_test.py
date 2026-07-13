@@ -3,19 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 
 from sqlalchemy import select
 
 import jobwatch.pipeline as pipeline_module
 from jobwatch.assess import Verdict
 from jobwatch.criteria import set_criteria_text
-from jobwatch.models import Assessment, Job, utcnow
+from jobwatch.models import Assessment, Job, UserSearch, utcnow
 from jobwatch.notify import NullNotifier
-from jobwatch.pipeline import assess_single, run_pipeline
-from jobwatch.search_jobs import JobSource, ScrapedJob, SearchConfig
-from jobwatch.searches import set_searches
+from jobwatch.pipeline import assess_single, hours_to_search, run_pipeline
+from jobwatch.search_jobs import JobSource, ScrapedJob
 
-SEARCH = SearchConfig(name="test", search_term="engineer", location="Denmark")
+
+def add_search(session, search_term: str = "engineer") -> UserSearch:
+    search = session.scalar(select(UserSearch).where(UserSearch.search_term == search_term))
+    if search is None:
+        search = UserSearch(search_term=search_term, location="Denmark")
+        session.add(search)
+        session.commit()
+    return search
 
 
 def fake_source(search_function) -> JobSource:
@@ -50,8 +57,10 @@ class FakeLLM:
 
 def run(session, llm, jobs, monkeypatch, criteria="Positives: python"):
     set_criteria_text(session, criteria)
-    set_searches(session, [SEARCH])
-    monkeypatch.setattr(pipeline_module, "JOB_SOURCES", [fake_source(lambda search: jobs)])
+    add_search(session)
+    monkeypatch.setattr(
+        pipeline_module, "JOB_SOURCES", [fake_source(lambda search, hours_old: jobs)]
+    )
     monkeypatch.setattr(pipeline_module, "make_notifier", NullNotifier)
     asyncio.run(run_pipeline(session, llm))
 
@@ -66,6 +75,7 @@ def test_new_jobs_are_stored_assessed_and_notified_once(session, monkeypatch):
 
     jobs = all_jobs(session)
     assert [job.external_id for job in jobs] == ["1", "2"]
+    assert all(job.search_id == add_search(session).id for job in jobs)
     assert all(job.active_assessment is not None for job in jobs)
     assert all(job.notified_at is not None for job in jobs)
     first_notified_at = [job.notified_at for job in jobs]
@@ -133,17 +143,35 @@ def test_empty_criteria_skips_assessment(session, monkeypatch):
 
 
 def test_scrape_failure_does_not_abort_pipeline(session, monkeypatch):
-    def boom(search):
+    def boom(search, hours_old):
         raise RuntimeError("linkedin said no")
 
-    set_searches(session, [SEARCH])
+    add_search(session)
     monkeypatch.setattr(pipeline_module, "JOB_SOURCES", [fake_source(boom)])
     asyncio.run(run_pipeline(session, FakeLLM()))
     assert all_jobs(session) == []
 
 
+def test_hours_to_search_defaults_to_24_when_search_has_no_jobs(session):
+    assert hours_to_search(session, add_search(session)) == 24
+
+
+def test_hours_to_search_covers_the_gap_since_the_last_scrape(session, monkeypatch):
+    run(session, FakeLLM(), [scraped("1")], monkeypatch)
+    search = add_search(session)
+    assert hours_to_search(session, search) == 1  # just scraped; minimum lookback
+
+    job = session.scalars(select(Job)).one()
+    job.scraped_at = utcnow() - timedelta(hours=5, minutes=30)
+    session.commit()
+    assert hours_to_search(session, search) == 6  # rounded up, no gap
+
+    # A different search's jobs don't count.
+    assert hours_to_search(session, add_search(session, "something else")) == 24
+
+
 def test_no_configured_searches_scrapes_nothing(session, monkeypatch):
-    def boom(search):
+    def boom(search, hours_old):
         raise AssertionError("no source should be searched")
 
     monkeypatch.setattr(pipeline_module, "JOB_SOURCES", [fake_source(boom)])

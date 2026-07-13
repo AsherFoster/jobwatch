@@ -106,7 +106,6 @@ def test_notify() -> None:
         location="Nowhere",
         url="https://example.com",
         external_id="test",
-        search_name="test",
     )
     make_notifier().send_matches([fake], review_url=config.web.base_url)
     click.echo("Notification sent")

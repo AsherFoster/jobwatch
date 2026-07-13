@@ -10,7 +10,8 @@ from typing import Any
 
 import structlog
 
-from jobwatch.search_jobs import JobSource, ScrapedJob, SearchConfig
+from jobwatch.models import UserSearch
+from jobwatch.search_jobs import JobSource, ScrapedJob
 
 log = structlog.getLogger(__name__)
 
@@ -20,7 +21,7 @@ def _text(record: dict[str, Any], key: str) -> str:
     return "" if value is None or value != value else str(value)  # NaN check
 
 
-def search_linkedin(search: SearchConfig) -> Generator[ScrapedJob]:
+def search_linkedin(search: UserSearch, hours_old: int) -> Generator[ScrapedJob]:
     # Imported lazily: jobspy pulls in pandas, which is slow to import and not
     # needed by the web UI or tests.
     from jobspy import scrape_jobs
@@ -29,11 +30,11 @@ def search_linkedin(search: SearchConfig) -> Generator[ScrapedJob]:
         site_name=["linkedin"],
         search_term=search.search_term,
         location=search.location,
-        results_wanted=search.results_wanted,
-        hours_old=search.hours_old,
+        results_wanted=1000,  # LinkedIn's anonymous view caps out at 1000 anyway
+        hours_old=hours_old,
         linkedin_fetch_description=True,
     )
-    log.info("Search %r returned %d jobs", search.name, len(df))
+    log.info("Search %r returned %d jobs", search.search_term, len(df))
 
     for record in df.to_dict(orient="records"):
         url = _text(record, "job_url")

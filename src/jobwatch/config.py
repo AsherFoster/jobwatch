@@ -1,7 +1,7 @@
 """Load and validate config.toml.
 
 Every field has a default, so the file is optional — used mostly to point at
-a real Discord webhook and LLM. Searches live in the DB (see searches.py).
+a real Discord webhook and LLM. Searches live in the DB (see UserSearch).
 """
 
 from __future__ import annotations

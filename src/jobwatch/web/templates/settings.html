@@ -20,25 +20,19 @@
 </p>
 {% if saved == "searches" %}<p><span class="badge yes">Saved</span></p>{% endif %}
 {% for search in searches %}
-<form method="post" action="/settings/searches/{{ loop.index0 }}" class="search-form">
-  <label>Name <input name="name" value="{{ search.name }}" required></label>
+<form method="post" action="/settings/searches/{{ search.id }}" class="search-form">
   <label>Search term <input name="search_term" value="{{ search.search_term }}" required></label>
   <label>Location <input name="location" value="{{ search.location }}" required></label>
-  <label>Results wanted <input name="results_wanted" type="number" min="1" value="{{ search.results_wanted }}" required></label>
-  <label>Hours old <input name="hours_old" type="number" min="1" value="{{ search.hours_old }}" required></label>
   <button type="submit">Save</button>
-  <button type="submit" formaction="/settings/searches/{{ loop.index0 }}/delete" formnovalidate>Delete</button>
+  <button type="submit" formaction="/settings/searches/{{ search.id }}/delete" formnovalidate>Delete</button>
 </form>
 {% else %}
 <p class="muted">No searches configured — the worker has nothing to scrape.</p>
 {% endfor %}
 <h3>Add search</h3>
 <form method="post" action="/settings/searches" class="search-form">
-  <label>Name <input name="name" placeholder="swe-denmark" required></label>
   <label>Search term <input name="search_term" placeholder="software engineer" required></label>
   <label>Location <input name="location" placeholder="Denmark" required></label>
-  <label>Results wanted <input name="results_wanted" type="number" min="1" value="100" required></label>
-  <label>Hours old <input name="hours_old" type="number" min="1" value="24" required></label>
   <button type="submit">Add</button>
 </form>
 {% endblock %}
