@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from jobwatch.config import config
 
-
 engine = create_engine(config.database_url)
 session_maker = sessionmaker(engine, expire_on_commit=False)
 

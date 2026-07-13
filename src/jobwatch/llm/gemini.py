@@ -19,8 +19,8 @@ class GeminiVerdict(BaseModel):
 
 
 class GeminiClient:
-    def __init__(self, model: str, api_key: str | None = None) -> None:
-        self._client = genai.Client(api_key=api_key) if api_key else genai.Client()
+    def __init__(self, model: str, api_key: str) -> None:
+        self._client = genai.Client(api_key=api_key)
         self.model = model
 
     async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
@@ -60,6 +60,9 @@ Decide whether the posting is worth their time to review.
         )
 
         assert isinstance(interaction, Interaction)  # stream=False never returns a stream
+        if interaction.status != "completed":
+            raise ValueError("gemini request was not successful")
+
         model_verdict = GeminiVerdict.model_validate_json(interaction.output_text or "")
 
         return Verdict(
