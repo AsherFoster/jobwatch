@@ -44,13 +44,8 @@ Decide whether the posting is worth their time to review.
 """
         interaction = await self._client.aio.interactions.create(
             model=self.model,
-            stream=False,
             system_instruction=system_prompt,
-            input=[
-                {"role": "user", "content": user_criteria},
-                {"role": "user", "content": job_details},
-            ],
-            response_mime_type="application/json",
+            input=f"""# Criteria:\n{criteria_text}\n\n#Job Details:\n{job_details}""",
             response_format={
                 "type": "text",
                 "mime_type": "application/json",
