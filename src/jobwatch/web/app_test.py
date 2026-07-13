@@ -11,9 +11,7 @@ from sqlalchemy.orm import Session
 
 from jobwatch.criteria import set_criteria_text
 from jobwatch.llm import Verdict
-from jobwatch.models import Job, UserJobState
-from jobwatch.search_jobs import SearchConfig
-from jobwatch.searches import get_searches, set_searches
+from jobwatch.models import Job, UserJobState, UserSearch
 from jobwatch.web.app import app, get_session
 
 
@@ -65,89 +63,86 @@ def test_saving_criteria_persists(client):
     assert "Positives: python." not in response.text
 
 
+def _add_search(session: Session, search_term: str = "x", location: str = "y") -> int:
+    search = UserSearch(search_term=search_term, location=location)
+    session.add(search)
+    session.commit()
+    return search.id
+
+
+def _searches(session: Session) -> list[tuple[str, str]]:
+    rows = session.scalars(select(UserSearch).order_by(UserSearch.id))
+    return [(s.search_term, s.location) for s in rows]
+
+
 def test_adding_search_persists(client, session: Session):
     response = client.post(
         "/settings/searches",
-        data={"name": "swe-dk", "search_term": "software engineer", "location": "Denmark"},
+        data={"search_term": "software engineer", "location": "Denmark"},
     )
     assert response.status_code == 200
     assert "Saved" in response.text
 
-    assert get_searches(session) == [
-        SearchConfig(name="swe-dk", search_term="software engineer", location="Denmark")
-    ]
+    assert _searches(session) == [("software engineer", "Denmark")]
 
 
 def test_search_form_is_prefilled(client, session: Session):
-    set_searches(
-        session,
-        [SearchConfig(name="sre-dk", search_term="SRE", location="Denmark", results_wanted=20)],
-    )
+    _add_search(session, search_term="SRE", location="Denmark")
     response = client.get("/settings")
-    assert 'value="sre-dk"' in response.text
     assert 'value="SRE"' in response.text
-    assert 'value="20"' in response.text
+    assert 'value="Denmark"' in response.text
 
 
 def test_updating_search_replaces_it(client, session: Session):
-    set_searches(
-        session,
-        [
-            SearchConfig(name="a", search_term="x", location="y"),
-            SearchConfig(name="b", search_term="x", location="y"),
-        ],
-    )
+    _add_search(session, search_term="a")
+    b_id = _add_search(session, search_term="b")
     client.post(
-        "/settings/searches/1",
-        data={
-            "name": "b2",
-            "search_term": "platform engineer",
-            "location": "Remote",
-            "results_wanted": "50",
-            "hours_old": "48",
-        },
+        f"/settings/searches/{b_id}",
+        data={"search_term": "platform engineer", "location": "Remote"},
     )
-    assert get_searches(session) == [
-        SearchConfig(name="a", search_term="x", location="y"),
-        SearchConfig(
-            name="b2",
-            search_term="platform engineer",
-            location="Remote",
-            results_wanted=50,
-            hours_old=48,
-        ),
-    ]
+    assert _searches(session) == [("a", "y"), ("platform engineer", "Remote")]
 
 
 def test_deleting_search_removes_only_that_one(client, session: Session):
-    set_searches(
-        session,
-        [
-            SearchConfig(name="a", search_term="x", location="y"),
-            SearchConfig(name="b", search_term="x", location="y"),
-        ],
-    )
-    response = client.post("/settings/searches/0/delete")
+    a_id = _add_search(session, search_term="a")
+    _add_search(session, search_term="b")
+    response = client.post(f"/settings/searches/{a_id}/delete")
     assert response.status_code == 200
-    assert get_searches(session) == [SearchConfig(name="b", search_term="x", location="y")]
+    assert _searches(session) == [("b", "y")]
 
 
-def test_search_index_out_of_range_404s(client, session: Session):
-    set_searches(session, [SearchConfig(name="a", search_term="x", location="y")])
-    data = {"name": "a", "search_term": "x", "location": "y"}
-    assert client.post("/settings/searches/1", data=data).status_code == 404
-    assert client.post("/settings/searches/1/delete").status_code == 404
+def test_deleting_search_keeps_its_jobs(client, session: Session):
+    search_id = _add_search(session)
+    job_id = _add_job(session, search_id=search_id)
+    client.post(f"/settings/searches/{search_id}/delete")
+
+    job = session.get(Job, job_id)
+    session.refresh(job)
+    assert job is not None
+    assert job.search_id is None
+
+
+def test_unknown_search_id_404s(client, session: Session):
+    _add_search(session)
+    data = {"search_term": "x", "location": "y"}
+    assert client.post("/settings/searches/999", data=data).status_code == 404
+    assert client.post("/settings/searches/999/delete").status_code == 404
 
 
 def test_job_list_renders(client):
     assert client.get("/?show=all").status_code == 200
 
 
-def _add_job(session: Session, external_id: str = "1", title: str = "Backend Engineer") -> int:
+def _add_job(
+    session: Session,
+    external_id: str = "1",
+    title: str = "Backend Engineer",
+    search_id: int | None = None,
+) -> int:
     job = Job(
         site="linkedin",
         external_id=external_id,
-        search_name="test",
+        search_id=search_id,
         title=title,
         company="Acme",
         location="Copenhagen",

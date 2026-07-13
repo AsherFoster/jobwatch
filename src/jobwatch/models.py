@@ -30,7 +30,8 @@ class Job(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     site: Mapped[str]
     external_id: Mapped[str]
-    search_name: Mapped[str]
+    # The search that found this job; null once that search is deleted.
+    search_id: Mapped[int | None] = mapped_column(ForeignKey("user_searches.id"))
     title: Mapped[str]
     company: Mapped[str]
     location: Mapped[str]
@@ -56,6 +57,7 @@ class Job(Base):
     )
     # The user's rating/bookmark/applied state, if they've touched this job.
     user_state: Mapped[UserJobState | None] = relationship(back_populates="job")
+    search: Mapped[UserSearch | None] = relationship()
 
     def latest_assessment(self) -> Assessment | None:
         return self.all_assessments[-1] if self.all_assessments else None
@@ -76,6 +78,18 @@ class UserJobState(Base):
     applied_at: Mapped[datetime | None]
 
     job: Mapped[Job] = relationship(back_populates="user_state")
+
+
+class UserSearch(Base):
+    """A saved job-board search the worker runs every cycle, and the parameters
+    handed to each job source. Single-user for now — gains a user_id if
+    multiple users arrive."""
+
+    __tablename__ = "user_searches"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    search_term: Mapped[str]
+    location: Mapped[str]
 
 
 class Setting(Base):

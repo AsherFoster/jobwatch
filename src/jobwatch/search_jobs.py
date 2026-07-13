@@ -1,7 +1,7 @@
 """Source-agnostic types for searching job boards.
 
 Each source lives in jobwatch.job_sources as a JobSource whose search
-function turns a SearchConfig into ScrapedJobs.
+function turns a UserSearch into ScrapedJobs.
 """
 
 from __future__ import annotations
@@ -10,15 +10,7 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from datetime import datetime
 
-from pydantic import BaseModel
-
-
-class SearchConfig(BaseModel):
-    name: str
-    search_term: str
-    location: str
-    results_wanted: int = 100
-    hours_old: int = 24
+from jobwatch.models import UserSearch
 
 
 @dataclass
@@ -38,4 +30,5 @@ class ScrapedJob:
 class JobSource:
     id: str
     name: str
-    search_function: Callable[[SearchConfig], Generator[ScrapedJob]]
+    # Yields jobs for a search, restricted to postings at most hours_old hours old.
+    search_function: Callable[[UserSearch, int], Generator[ScrapedJob]]

@@ -10,7 +10,7 @@
     <tr>
       <td>
         <a href="/jobs/{{ job.id }}">{{ job.title }}</a>
-        <div class="muted">{{ job.company }} · {{ job.search_name }}</div>
+        <div class="muted">{{ job.company }}{% if job.search %} · {{ job.search.search_term }}{% endif %}</div>
       </td>
       <td>{{ job.location }}</td>
       <td>

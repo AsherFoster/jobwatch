@@ -11,16 +11,14 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, selectinload
 
 from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
-from jobwatch.models import MATCHED_MIN_SCORE, Assessment, Job, UserJobState, utcnow
+from jobwatch.models import MATCHED_MIN_SCORE, Assessment, Job, UserJobState, UserSearch, utcnow
 from jobwatch.pipeline import assess_single
-from jobwatch.search_jobs import SearchConfig
-from jobwatch.searches import get_searches, set_searches
 from jobwatch.user_state import set_job_applied, set_job_bookmarked, set_job_rating
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -50,6 +48,7 @@ def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
             selectinload(Job.all_assessments),
             selectinload(Job.active_assessment),
             selectinload(Job.user_state),
+            selectinload(Job.search),
         )
         .order_by(Job.scraped_at.desc())
         .limit(500)
@@ -134,7 +133,7 @@ def settings(request: Request, session: SessionDep, saved: str = ""):
         "settings.html",
         {
             "criteria_text": get_criteria_text(session),
-            "searches": get_searches(session),
+            "searches": session.scalars(select(UserSearch).order_by(UserSearch.id)).all(),
             "saved": saved,
             "show": "settings",
         },
@@ -153,47 +152,44 @@ def save_criteria(session: SessionDep, text: str = Form("")):
 
 
 def search_form(
-    name: Annotated[str, Form()],
     search_term: Annotated[str, Form()],
     location: Annotated[str, Form()],
-    results_wanted: Annotated[int, Form()] = 100,
-    hours_old: Annotated[int, Form()] = 24,
-) -> SearchConfig:
-    return SearchConfig(
-        name=name,
-        search_term=search_term,
-        location=location,
-        results_wanted=results_wanted,
-        hours_old=hours_old,
-    )
+) -> UserSearch:
+    return UserSearch(search_term=search_term, location=location)
 
 
-SearchFormDep = Annotated[SearchConfig, Depends(search_form)]
+SearchFormDep = Annotated[UserSearch, Depends(search_form)]
+
+
+def get_user_search(search_id: int, session: SessionDep) -> UserSearch:
+    row = session.get(UserSearch, search_id)
+    if row is None:
+        raise HTTPException(status_code=404)
+    return row
+
+
+UserSearchDep = Annotated[UserSearch, Depends(get_user_search)]
 
 
 @app.post("/settings/searches")
 def add_search(session: SessionDep, search: SearchFormDep):
-    searches = get_searches(session)
-    searches.append(search)
-    set_searches(session, searches)
+    session.add(search)
+    session.commit()
     return RedirectResponse("/settings?saved=searches", status_code=303)
 
 
-@app.post("/settings/searches/{index}")
-def update_search(index: int, session: SessionDep, search: SearchFormDep):
-    searches = get_searches(session)
-    if not 0 <= index < len(searches):
-        raise HTTPException(status_code=404)
-    searches[index] = search
-    set_searches(session, searches)
+@app.post("/settings/searches/{search_id}")
+def update_search(row: UserSearchDep, session: SessionDep, search: SearchFormDep):
+    row.search_term = search.search_term
+    row.location = search.location
+    session.commit()
     return RedirectResponse("/settings?saved=searches", status_code=303)
 
 
-@app.post("/settings/searches/{index}/delete")
-def delete_search(index: int, session: SessionDep):
-    searches = get_searches(session)
-    if not 0 <= index < len(searches):
-        raise HTTPException(status_code=404)
-    del searches[index]
-    set_searches(session, searches)
+@app.post("/settings/searches/{search_id}/delete")
+def delete_search(row: UserSearchDep, session: SessionDep):
+    # Jobs found by this search outlive it, just without attribution.
+    session.execute(update(Job).where(Job.search_id == row.id).values(search_id=None))
+    session.delete(row)
+    session.commit()
     return RedirectResponse("/settings?saved=searches", status_code=303)
