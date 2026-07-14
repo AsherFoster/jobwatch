@@ -1,0 +1,1 @@
+database_url = "postgresql+psycopg://jobwatch:jobwatch@localhost:5432/jobwatch"

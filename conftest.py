@@ -2,20 +2,18 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session
 
+os.environ.setdefault("ENVIRONMENT", "test")
+assert os.environ.get("ENVIRONMENT") == "test"
+
+# ruff: noqa: E402
 from jobwatch.config import config
 from jobwatch.models import Base
-
-# Test modules are imported after this file, and jobwatch.config loads its file
-# at import time — config.toml (the default) is gitignored so may not exist.
-# Keep conftest's own imports free of anything that pulls in jobwatch.config.
-os.environ.setdefault("JOBWATCH_CONFIG", str(Path(__file__).parent / "config.test.toml"))
 
 
 def _create_test_database_if_missing(database_url: str) -> None:

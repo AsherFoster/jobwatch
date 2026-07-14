@@ -10,7 +10,7 @@ wheels/
 .venv
 
 # jobwatch local state
-config.toml
+config.local.toml
 data/
 
 

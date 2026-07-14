@@ -7,12 +7,13 @@ a real Discord webhook and LLM. Searches live in the DB (see UserSearch).
 from __future__ import annotations
 
 import os
-import tomllib
-from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict, TomlConfigSettingsSource
 
-DEFAULT_CONFIG_PATH = Path("config.toml")
+environment = os.environ.get("ENVIRONMENT")
+assert environment in ["production", "development", "test"]
 
 
 class OllamaConfig(BaseModel):
@@ -20,16 +21,16 @@ class OllamaConfig(BaseModel):
 
 
 class AnthropicConfig(BaseModel):
-    api_key: str | None = None  # falls back to ANTHROPIC_API_KEY
+    api_key: str
 
 
 class GeminiConfig(BaseModel):
-    api_key: str | None = None  # falls back to GEMINI_API_KEY
+    api_key: str
 
 
 class LLMConfig(BaseModel):
-    provider: str = "ollama"  # "ollama", "apple_fm", "anthropic" or "gemini"
-    model: str = "qwen3:8b"  # ignored by apple_fm (single on-device model)
+    provider: Literal["ollama", "apple_fm", "anthropic", "gemini"]
+    model: str
 
 
 class DiscordConfig(BaseModel):
@@ -49,7 +50,11 @@ class WebConfig(BaseModel):
     base_url: str
 
 
-class Config(BaseModel):
+class Config(BaseSettings):
+    model_config = SettingsConfigDict(
+        toml_file=["config.toml", f"config.{environment}.toml", "config.local.toml"]
+    )
+
     database_url: str
     llm: LLMConfig
     ollama: OllamaConfig | None = None
@@ -59,7 +64,17 @@ class Config(BaseModel):
     schedule: ScheduleConfig
     web: WebConfig
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        # Returning only the TOML source drops env vars, dotenv, and secrets entirely.
+        return (TomlConfigSettingsSource(settings_cls, deep_merge=True),)
 
-path = os.environ.get("JOBWATCH_CONFIG") or DEFAULT_CONFIG_PATH
-with open(path, "rb") as f:
-    config = Config.model_validate(tomllib.load(f))
+
+config = Config()

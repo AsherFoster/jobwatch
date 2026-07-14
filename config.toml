@@ -1,10 +1,8 @@
-# Copy to config.toml and edit. Contains secrets, do not commit
-
-database_url = "postgresql+psycopg://jobwatch:jobwatch@localhost:5432/jobwatch"
+# database_url = "postgresql+psycopg://..."
 
 [llm]
-provider = "ollama"    # options: anthropic, gemini, ollama, apple_fm
-model = "qwen3:8b"
+provider = "gemini"
+model = "gemini-3.1-flash-lite"
 
 # [ollama]
 # base_url = "http://host.docker.internal:11434"
@@ -15,8 +13,8 @@ model = "qwen3:8b"
 # [gemini]
 # api_key = "AIza..."     # defaults to $GEMINI_API_KEY
 
-[notify.discord]
-webhook_url = "https://discord.com/api/webhooks/CHANGE-ME"
+# [notify.discord]
+# webhook_url = "https://discord.com/api/webhooks/CHANGE-ME"
 
 [schedule]
 interval_minutes = 60
