@@ -10,7 +10,7 @@ from sqlalchemy import select
 import jobwatch.pipeline as pipeline_module
 from jobwatch.assess import Verdict
 from jobwatch.criteria import set_criteria_text
-from jobwatch.models import Assessment, Job, UserSearch, utcnow
+from jobwatch.models import Assessment, CompanyDetails, Job, UserSearch, utcnow
 from jobwatch.notify import NullNotifier
 from jobwatch.pipeline import assess_single, hours_to_search, run_pipeline
 from jobwatch.search_jobs import JobSource, ScrapedJob
@@ -55,13 +55,18 @@ class FakeLLM:
         return Verdict(score=self.score, reasoning="test")
 
 
-def run(session, llm, jobs, monkeypatch, criteria="Positives: python"):
+async def fake_description(company: str) -> str:
+    return f"{company} makes widgets."
+
+
+def run(session, llm, jobs, monkeypatch, criteria="Positives: python", describe=fake_description):
     set_criteria_text(session, criteria)
     add_search(session)
     monkeypatch.setattr(
         pipeline_module, "JOB_SOURCES", [fake_source(lambda search, hours_old: jobs)]
     )
     monkeypatch.setattr(pipeline_module, "make_notifier", NullNotifier)
+    monkeypatch.setattr(pipeline_module, "generate_company_description", describe)
     asyncio.run(run_pipeline(session, llm))
 
 
@@ -85,6 +90,33 @@ def test_new_jobs_are_stored_assessed_and_notified_once(session, monkeypatch):
     assert len(all_jobs(session)) == 2
     assert len(session.scalars(select(Assessment)).all()) == 2
     assert [job.notified_at for job in all_jobs(session)] == first_notified_at
+
+
+def test_new_jobs_create_company_details_once_per_company(session, monkeypatch):
+    run(session, FakeLLM(), [scraped("1"), scraped("2")], monkeypatch)
+
+    details = session.scalars(select(CompanyDetails)).one()
+    assert details.name == "Acme"
+    assert details.description == "Acme makes widgets."
+    assert details.created_at is not None
+
+    # More jobs from a known company don't create another row.
+    run(session, FakeLLM(), [scraped("3")], monkeypatch)
+    assert len(session.scalars(select(CompanyDetails)).all()) == 1
+
+
+def test_company_description_failure_does_not_block_jobs(session, monkeypatch):
+    async def boom(company: str) -> str:
+        raise RuntimeError("gemini said no")
+
+    run(session, FakeLLM(), [scraped("1")], monkeypatch, describe=boom)
+
+    assert len(all_jobs(session)) == 1  # the job is stored regardless
+    assert session.scalars(select(CompanyDetails)).all() == []
+
+    # A later job from the same company retries the generation.
+    run(session, FakeLLM(), [scraped("2")], monkeypatch)
+    assert session.scalars(select(CompanyDetails)).one().name == "Acme"
 
 
 def test_unmatched_jobs_do_not_notify(session, monkeypatch):

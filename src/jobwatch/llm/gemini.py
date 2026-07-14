@@ -6,10 +6,39 @@ from google import genai
 from google.genai.interactions import Interaction
 from pydantic import BaseModel, Field
 
+from jobwatch.config import config
 from jobwatch.llm import Verdict
 from jobwatch.models import Job
 
 log = structlog.get_logger()
+
+# Company descriptions are a lightweight, high-frequency task; always uses
+# Gemini (with Google Search) regardless of the configured assessment LLM.
+COMPANY_DESCRIPTION_MODEL = "gemini-3.1-flash-lite"
+
+
+async def generate_company_description(company: str) -> str:
+    """One-sentence description of a company, grounded via Google Search."""
+    api_key = config.gemini.api_key if config.gemini else None
+    client = genai.Client(api_key=api_key)
+    interaction = await client.aio.interactions.create(
+        model=COMPANY_DESCRIPTION_MODEL,
+        input=(
+            f"In exactly one sentence, describe what the company {company!r} does. "
+            "Use Google Search to find out. Respond with only that sentence."
+        ),
+        tools=[{"type": "google_search"}],
+        store=False,
+    )
+
+    assert isinstance(interaction, Interaction)  # stream=False never returns a stream
+    if interaction.status != "completed":
+        raise ValueError("gemini request was not successful")
+
+    description = (interaction.output_text or "").strip()
+    if not description:
+        raise ValueError("gemini returned an empty description")
+    return description
 
 
 class GeminiVerdict(BaseModel):

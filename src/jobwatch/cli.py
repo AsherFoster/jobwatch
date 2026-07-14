@@ -58,7 +58,7 @@ def sync_jobs_command() -> None:
     from jobwatch.pipeline import sync_jobs
 
     with session_maker() as session:
-        sync_jobs(session)
+        asyncio.run(sync_jobs(session))
 
 
 @app.command("assess-jobs")

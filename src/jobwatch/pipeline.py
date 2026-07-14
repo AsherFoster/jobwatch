@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import UTC
 
@@ -14,7 +15,14 @@ from jobwatch.config import config
 from jobwatch.criteria import get_criteria_text
 from jobwatch.job_sources import JOB_SOURCES
 from jobwatch.llm import LLMClient
-from jobwatch.models import MATCHED_MIN_SCORE, Assessment, Job, UserSearch, utcnow
+from jobwatch.models import (
+    MATCHED_MIN_SCORE,
+    Assessment,
+    CompanyDetails,
+    Job,
+    UserSearch,
+    utcnow,
+)
 from jobwatch.notify import make_notifier
 from jobwatch.search_jobs import ScrapedJob
 
@@ -24,7 +32,31 @@ log = structlog.getLogger(__name__)
 DEFAULT_HOURS_OLD = 24
 
 
-def store_new_jobs(session: Session, search: UserSearch, scraped: list[ScrapedJob]) -> int:
+async def generate_company_description(company: str) -> str:
+    # Imported lazily: google-genai is the optional [gemini] extra.
+    from jobwatch.llm import gemini
+
+    return await gemini.generate_company_description(company)
+
+
+async def ensure_company_details(session: Session, item: ScrapedJob) -> None:
+    """Create a CompanyDetails row for this job's company, unless one exists.
+
+    A failed generation is logged and skipped — no row is created, so the next
+    job from that company retries."""
+    exists = session.scalar(select(CompanyDetails.id).where(CompanyDetails.name == item.company))
+    if exists:
+        return
+    try:
+        description = await generate_company_description(item.company)
+    except Exception:
+        log.exception("Description generation failed", company=item.company)
+        return
+    logo = json.loads(item.raw).get("company_logo") or None
+    session.add(CompanyDetails(name=item.company, logo=logo, description=description))
+
+
+async def store_new_jobs(session: Session, search: UserSearch, scraped: list[ScrapedJob]) -> int:
     """Insert jobs we haven't seen before; returns how many were new."""
     new = 0
     for item in scraped:
@@ -33,6 +65,7 @@ def store_new_jobs(session: Session, search: UserSearch, scraped: list[ScrapedJo
         )
         if exists:
             continue
+        await ensure_company_details(session, item)
         session.add(
             Job(
                 site=item.site,
@@ -64,7 +97,7 @@ def hours_to_search(session: Session, search: UserSearch) -> int:
     return max(1, math.ceil((utcnow() - last_scraped).total_seconds() / 3600))
 
 
-def sync_jobs(session: Session) -> None:
+async def sync_jobs(session: Session) -> None:
     """Run every configured search against every source and store unseen jobs;
     returns how many were new."""
     searches = session.scalars(select(UserSearch).order_by(UserSearch.id)).all()
@@ -81,7 +114,7 @@ def sync_jobs(session: Session) -> None:
                 )
                 continue
             log.info("scraped jobs", source=source.id, count=len(scraped))
-            new_count = store_new_jobs(session, search, scraped)
+            new_count = await store_new_jobs(session, search, scraped)
             log.info("saved jobs", source=source.id, count=new_count)
             session.commit()
 
@@ -147,6 +180,6 @@ def notify_new_matches(session: Session) -> list[Job]:
 
 
 async def run_pipeline(session: Session, llm: LLMClient) -> None:
-    sync_jobs(session)
+    await sync_jobs(session)
     await assess_pending(session, llm)
     notify_new_matches(session)
