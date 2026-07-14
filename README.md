@@ -22,7 +22,6 @@ of searches.
 
 ```bash
 docker compose up -d              # Postgres
-export ENVIRONMENT=development
 uv run alembic upgrade heads      # create the schema
 uv run fastapi dev                # web UI (app path comes from pyproject.toml)
 uv run jobwatch worker            # scheduled pipeline (separate process)
