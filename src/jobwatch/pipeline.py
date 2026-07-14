@@ -44,7 +44,9 @@ async def ensure_company_details(session: Session, item: ScrapedJob) -> None:
 
     A failed generation is logged and skipped — no row is created, so the next
     job from that company retries."""
-    exists = session.scalar(select(CompanyDetails.id).where(CompanyDetails.name == item.company))
+    exists = session.scalar(
+        select(CompanyDetails.id).where(CompanyDetails.name.ilike(item.company))
+    )
     if exists:
         return
     try:
