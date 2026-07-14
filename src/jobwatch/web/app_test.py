@@ -99,11 +99,13 @@ def test_saving_criteria_persists(client):
     assert "Positives: python." not in response.text
 
 
-def _add_search(session: Session, search_term: str = "x", location: str = "y") -> int:
-    search = UserSearch(search_term=search_term, location=location)
+def _add_search(
+    session: Session, user: User, search_term: str = "x", location: str = "y"
+) -> UserSearch:
+    # TODO remove and replace with scene
+    search = UserSearch(search_term=search_term, location=location, user=user)
     session.add(search)
-    session.commit()
-    return search.id
+    return search
 
 
 def _searches(session: Session) -> list[tuple[str, str]]:
@@ -122,44 +124,43 @@ def test_adding_search_persists(client, session: Session):
     assert _searches(session) == [("software engineer", "Denmark")]
 
 
-def test_search_form_is_prefilled(client, session: Session):
-    _add_search(session, search_term="SRE", location="Denmark")
+def test_search_form_is_prefilled(client, session: Session, user: User):
+    _add_search(session, user, search_term="SRE", location="Denmark")
     response = client.get("/settings")
     assert 'value="SRE"' in response.text
     assert 'value="Denmark"' in response.text
 
 
-def test_updating_search_replaces_it(client, session: Session):
-    _add_search(session, search_term="a")
-    b_id = _add_search(session, search_term="b")
+def test_updating_search_replaces_it(client, session: Session, user: User):
+    _add_search(session, user, search_term="a")
+    search_b = _add_search(session, user, search_term="b")
     client.post(
-        f"/settings/searches/{b_id}",
+        f"/settings/searches/{search_b.id}",
         data={"search_term": "platform engineer", "location": "Remote"},
     )
     assert _searches(session) == [("a", "y"), ("platform engineer", "Remote")]
 
 
-def test_deleting_search_removes_only_that_one(client, session: Session):
-    a_id = _add_search(session, search_term="a")
-    _add_search(session, search_term="b")
-    response = client.post(f"/settings/searches/{a_id}/delete")
+def test_deleting_search_removes_only_that_one(client, session: Session, user: User):
+    search_a = _add_search(session, user, search_term="a")
+    _add_search(session, user, search_term="b")
+    response = client.post(f"/settings/searches/{search_a.id}/delete")
     assert response.status_code == 200
     assert _searches(session) == [("b", "y")]
 
 
-def test_deleting_search_keeps_its_jobs(client, session: Session):
-    search_id = _add_search(session)
-    job_id = _add_job(session, search_id=search_id)
-    client.post(f"/settings/searches/{search_id}/delete")
+def test_deleting_search_keeps_its_jobs(client, session: Session, user: User):
+    search = _add_search(session, user)
+    job = _add_job(session, search=search)
+    client.post(f"/settings/searches/{search.id}/delete")
 
-    job = session.get(Job, job_id)
     session.refresh(job)
     assert job is not None
     assert job.search_id is None
 
 
-def test_unknown_search_id_404s(client, session: Session):
-    _add_search(session)
+def test_unknown_search_id_404s(client, session: Session, user: User):
+    _add_search(session, user=user)
     data = {"search_term": "x", "location": "y"}
     assert client.post("/settings/searches/999", data=data).status_code == 404
     assert client.post("/settings/searches/999/delete").status_code == 404
@@ -171,14 +172,15 @@ def test_job_list_renders(client):
 
 def _add_job(
     session: Session,
+    search: UserSearch,
     external_id: str = "1",
     title: str = "Backend Engineer",
-    search_id: int | None = None,
-) -> int:
+) -> Job:
+    # TODO remove and replace with scene
     job = Job(
         site="linkedin",
         external_id=external_id,
-        search_id=search_id,
+        search=search,
         title=title,
         company="Acme",
         location="Copenhagen",
@@ -187,26 +189,24 @@ def _add_job(
         raw="{}",
     )
     session.add(job)
-    session.commit()
-    return job.id
+    return job
 
 
 def test_reassess_creates_new_verdict_and_keeps_old_as_history(
     client, session: Session, user: User
 ):
-    job_id = _add_job(session)
+    job = _add_job(session, search=_add_search(session, user))
 
-    response = client.post(f"/jobs/{job_id}/reassess")
+    response = client.post(f"/jobs/{job.id}/reassess")
     assert response.status_code == 200  # followed the redirect to the job page
     assert "current" in response.text
 
     user.criteria_text = "Completely different criteria"
     session.commit()
 
-    response = client.post(f"/jobs/{job_id}/reassess")
+    response = client.post(f"/jobs/{job.id}/reassess")
     assert response.status_code == 200
 
-    job = session.get(Job, job_id)
     session.refresh(job)
 
     assert job is not None
@@ -225,75 +225,76 @@ def _user_states(session: Session) -> list[UserJobState]:
     return list(session.scalars(select(UserJobState)))
 
 
-def test_rating_persists_and_updates_in_place(client, session: Session):
-    job_id = _add_job(session)
+def test_rating_persists_and_updates_in_place(client, session: Session, user: User):
+    job = _add_job(session, search=_add_search(session, user))
 
-    response = client.put(f"/jobs/{job_id}/rating", data={"rating": "4"})
+    response = client.put(f"/jobs/{job.id}/rating", data={"rating": "4"})
     assert response.status_code == 204
-    assert client.get(f"/jobs/{job_id}").text.count("★") == 4
+    assert client.get(f"/jobs/{job.id}").text.count("★") == 4
 
-    client.put(f"/jobs/{job_id}/rating", data={"rating": "2"})
+    client.put(f"/jobs/{job.id}/rating", data={"rating": "2"})
 
     states = _user_states(session)
     assert len(states) == 1
-    assert states[0].job_id == job_id
+    assert states[0].job_id == job.id
     assert states[0].rating == 2
 
 
-def test_rating_delete_clears(client, session: Session):
-    job_id = _add_job(session)
-    client.put(f"/jobs/{job_id}/rating", data={"rating": "3"})
-    client.delete(f"/jobs/{job_id}/rating")
+def test_rating_delete_clears(client, session: Session, user: User):
+    job = _add_job(session, search=_add_search(session, user))
+    client.put(f"/jobs/{job.id}/rating", data={"rating": "3"})
+    client.delete(f"/jobs/{job.id}/rating")
 
     assert _user_states(session)[0].rating is None
 
 
-def test_rating_out_of_range_is_rejected(client, session: Session):
-    job_id = _add_job(session)
-    assert client.put(f"/jobs/{job_id}/rating", data={"rating": "6"}).status_code == 422
-    assert client.put(f"/jobs/{job_id}/rating", data={"rating": "0"}).status_code == 422
+def test_rating_out_of_range_is_rejected(client, session: Session, user: User):
+    job = _add_job(session, search=_add_search(session, user))
+    assert client.put(f"/jobs/{job.id}/rating", data={"rating": "6"}).status_code == 422
+    assert client.put(f"/jobs/{job.id}/rating", data={"rating": "0"}).status_code == 422
     assert _user_states(session) == []
 
 
-def test_bookmark_set_and_clear(client, session: Session):
-    job_id = _add_job(session)
+def test_bookmark_set_and_clear(client, session: Session, user: User):
+    job = _add_job(session, search=_add_search(session, user))
 
-    assert client.put(f"/jobs/{job_id}/bookmark").status_code == 204
+    assert client.put(f"/jobs/{job.id}/bookmark").status_code == 204
     assert _user_states(session)[0].bookmarked_at is not None
 
-    assert client.delete(f"/jobs/{job_id}/bookmark").status_code == 204
+    assert client.delete(f"/jobs/{job.id}/bookmark").status_code == 204
     assert _user_states(session)[0].bookmarked_at is None
 
 
-def test_bookmark_is_idempotent(client, session: Session):
+def test_bookmark_is_idempotent(client, session: Session, user: User):
     # A double-clicked Save button PUTs twice: the job stays bookmarked and
     # keeps the first click's timestamp.
-    job_id = _add_job(session)
+    job = _add_job(session, search=_add_search(session, user))
 
-    client.put(f"/jobs/{job_id}/bookmark")
+    client.put(f"/jobs/{job.id}/bookmark")
     first = _user_states(session)[0].bookmarked_at
 
-    client.put(f"/jobs/{job_id}/bookmark")
+    client.put(f"/jobs/{job.id}/bookmark")
     assert _user_states(session)[0].bookmarked_at == first
 
 
-def test_applied_set_and_clear(client, session: Session):
-    job_id = _add_job(session)
+def test_applied_set_and_clear(client, session: Session, user: User):
+    job = _add_job(session, search=_add_search(session, user))
 
-    client.put(f"/jobs/{job_id}/applied")
+    client.put(f"/jobs/{job.id}/applied")
     assert _user_states(session)[0].applied_at is not None
-    assert "Applied" in client.get(f"/jobs/{job_id}").text
+    assert "Applied" in client.get(f"/jobs/{job.id}").text
 
-    client.put(f"/jobs/{job_id}/applied")
+    client.put(f"/jobs/{job.id}/applied")
     assert _user_states(session)[0].applied_at is not None
 
-    client.delete(f"/jobs/{job_id}/applied")
+    client.delete(f"/jobs/{job.id}/applied")
     assert _user_states(session)[0].applied_at is None
 
 
-def test_saved_tab_lists_only_bookmarked_jobs(client, session: Session):
-    bookmarked_id = _add_job(session, external_id="1", title="Backend Engineer")
-    _add_job(session, external_id="2", title="Frontend Engineer")
+def test_saved_tab_lists_only_bookmarked_jobs(client, session: Session, user: User):
+    search = _add_search(session, user)
+    bookmarked_id = _add_job(session, search, external_id="1", title="Backend Engineer")
+    _add_job(session, search, external_id="2", title="Frontend Engineer")
     client.put(f"/jobs/{bookmarked_id}/bookmark")
 
     response = client.get("/?show=saved")

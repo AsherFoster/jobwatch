@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from jobwatch.job_sources.base import JobSource
 from jobwatch.models import Job, UserSearch, utcnow
 from jobwatch.pipeline.sync_jobs import hours_to_search, store_new_jobs, sync_jobs
-from jobwatch.test_scene import Scene
+from jobwatch.test_scene import Scene, scene
 
 
 def stored_external_ids(session: Session) -> list[str]:
@@ -23,7 +23,6 @@ async def test_store_new_jobs_persists_the_scrape(session, scene: Scene):
     item = scene.scraped_job(external_id="abc123")
 
     assert await store_new_jobs(session, search, [item]) == 1
-    session.commit()
 
     job = session.scalars(select(Job)).one()
     assert job.site == item.site
@@ -43,12 +42,10 @@ async def test_store_new_jobs_skips_jobs_already_seen(session, scene: Scene):
     search = scene.user_search()
     scraped = [scene.scraped_job(external_id="1"), scene.scraped_job(external_id="2")]
     assert await store_new_jobs(session, search, scraped) == 2
-    session.commit()
 
     # "2" was stored last round; only "3" is new.
     scraped = [scene.scraped_job(external_id="2"), scene.scraped_job(external_id="3")]
     assert await store_new_jobs(session, search, scraped) == 1
-    session.commit()
     assert stored_external_ids(session) == ["1", "2", "3"]
 
 
@@ -58,7 +55,10 @@ def test_hours_to_search_defaults_when_search_has_never_found_jobs(session, scen
 
 def test_hours_to_search_covers_the_gap_since_the_last_scrape(session, scene: Scene):
     search = scene.user_search()
-    scene.job(search=search, scraped_at=utcnow() - timedelta(hours=5, minutes=30))
+    job = scene.job(search=search)
+    job.scraped_at = utcnow() - timedelta(hours=5, minutes=30)
+    session.flush()
+
     assert hours_to_search(session, search) == 6  # rounded up
 
     # Another search's jobs don't count.

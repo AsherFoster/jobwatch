@@ -25,7 +25,7 @@ async def assess_single(session: Session, llm: LLMClient, job: Job, criteria_tex
         log.info("Assessed job", score=verdict.score)
     session.add(
         Assessment(
-            job_id=job.id,
+            job=job,
             score=verdict.score,
             reasoning=verdict.reasoning,
             model=llm.model,

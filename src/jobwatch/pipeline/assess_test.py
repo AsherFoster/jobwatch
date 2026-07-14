@@ -8,7 +8,7 @@ from sqlalchemy import select
 from jobwatch.llm import Verdict
 from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.pipeline.assess import assess_pending, assess_single, get_unassessed_job
-from jobwatch.test_scene import Scene
+from jobwatch.test_scene import Scene, scene
 from jobwatch.typing import unwrap
 
 
@@ -29,7 +29,6 @@ async def test_assess_single_stores_the_verdict(session, scene: Scene):
     job = scene.job()
 
     verdict = await assess_single(session, FakeLLM(score=4), job, "criteria")
-    session.commit()
 
     assert verdict.score == 4
     assessment = session.scalars(select(Assessment)).one()
@@ -71,7 +70,9 @@ async def test_invalidated_verdict_is_reassessed_and_kept_as_history(session, sc
 
 
 def test_get_unassessed_job_picks_the_oldest_scrape_first(session, scene: Scene):
-    scene.job(scraped_at=utcnow())
-    older = scene.job(scraped_at=utcnow() - timedelta(hours=2))
+    newer = scene.job()
+    newer.scraped_at = utcnow()
+    older = scene.job()
+    older.scraped_at = utcnow() - timedelta(hours=2)
 
     assert unwrap(get_unassessed_job(session)).id == older.id

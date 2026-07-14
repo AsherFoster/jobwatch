@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from jobwatch.models import CompanyDetails
 from jobwatch.pipeline.sync_companies import ensure_company_details
-from jobwatch.test_scene import Scene
+from jobwatch.test_scene import Scene, scene
 
 
 @pytest.fixture
