@@ -131,7 +131,12 @@ class Assessment(Base):
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
     score: Mapped[int]
     """1-5 stars (0 = response was unparseable)."""
+
     reasoning: Mapped[str]
+    summary: Mapped[str]
+    summary_positives: Mapped[str]
+    summary_negatives: Mapped[str]
+
     model: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     invalidated_at: Mapped[datetime | None]

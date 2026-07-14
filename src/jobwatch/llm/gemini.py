@@ -42,9 +42,22 @@ async def generate_company_description(company: str) -> str:
 
 
 class GeminiVerdict(BaseModel):
+    summary: str
+    """Exactly 1 sentence objectively summarising the job"""
+    summary_positives: str
+    """Exactly 1 sentence summarising why this job would be a good fit for the job seeker """
+    summary_negatives: str
+    """Exactly 1 sentence summarising why this job would NOT be a good fit for the job seeker """
+
     reasoning: str
+    """2 sentences of reasoning behind how this job is scored"""
 
     score: Annotated[int, Field(strict=True, ge=1, le=5)]
+    """
+    1 - 2: not a match, many downsides and no redeeming qualities
+    3: uncertain, doesn't appear to suit but may be worth a second look
+    4 - 5: well suited, aligns well to the job seeker, with few downsides
+    """
 
 
 class GeminiClient:
@@ -56,10 +69,6 @@ class GeminiClient:
         system_prompt = """
 You screen job postings for a job seeker. You are given their criteria and one job posting.
 Decide whether the posting is worth their time to review.
-
-1 - 2: not a match, many downsides and no redeeming qualities
-3: uncertain, doesn't appear to suit but may be worth a second look
-4 - 5: well suited, aligns well to the job seeker, with few downsides
         """
 
         clean_description = re.sub(r"\n+", "\n", re.sub(r" +", " ", job.description))
@@ -91,4 +100,7 @@ Decide whether the posting is worth their time to review.
         return Verdict(
             score=model_verdict.score,
             reasoning=model_verdict.reasoning,
+            summary=model_verdict.summary,
+            summary_positives=model_verdict.summary_positives,
+            summary_negatives=model_verdict.summary_negatives,
         )

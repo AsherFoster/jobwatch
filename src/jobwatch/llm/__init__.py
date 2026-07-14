@@ -9,6 +9,9 @@ from jobwatch.models import Job
 class Verdict:
     score: int
     reasoning: str
+    summary: str
+    summary_positives: str
+    summary_negatives: str
 
 
 class LLMClient(Protocol):

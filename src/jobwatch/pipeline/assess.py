@@ -28,6 +28,9 @@ async def assess_single(session: Session, llm: LLMClient, job: Job, criteria_tex
             job=job,
             score=verdict.score,
             reasoning=verdict.reasoning,
+            summary=verdict.summary,
+            summary_positives=verdict.summary_positives,
+            summary_negatives=verdict.summary_negatives,
             model=llm.model,
         )
     )

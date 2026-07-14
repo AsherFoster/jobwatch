@@ -65,7 +65,15 @@ class Scene:
         self, *, job: Job | None = None, score: int = 5, notified: bool = False
     ) -> Assessment:
         job = job or self.job()
-        assessment = Assessment(job=job, score=score, reasoning="good fit", model="fake")
+        assessment = Assessment(
+            job=job,
+            score=score,
+            reasoning="good fit",
+            model="fake",
+            summary="good job",
+            summary_positives="it's a job",
+            summary_negatives="it's a job",
+        )
         self.session.add(assessment)
         if notified:
             job.notified_at = utcnow()
