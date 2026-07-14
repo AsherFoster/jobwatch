@@ -109,7 +109,3 @@ def test_notify() -> None:
     )
     make_notifier().send_matches([fake], review_url=config.web.base_url)
     click.echo("Notification sent")
-
-
-if __name__ == "__main__":
-    app()
