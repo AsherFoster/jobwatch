@@ -24,7 +24,7 @@ of searches.
 docker compose up -d              # Postgres
 uv run alembic upgrade heads      # create the schema
 uv run fastapi dev                # web UI (app path comes from pyproject.toml)
-uv run jobwatch worker            # scheduled pipeline (separate process)
+uv run jobwatch worker            # awa task-queue worker (separate process)
 ```
 
 `ENVIRONMENT` must be one of `production`, `development`, or `test`. Every
@@ -69,7 +69,7 @@ that yet.
 
 ```bash
 uv run fastapi dev                 # web UI (no pipeline); Docker serves it with uvicorn
-uv run jobwatch worker             # scrape → assess → notify on a schedule, forever
+uv run jobwatch worker             # awa worker: syncs jobs hourly, forever
 uv run jobwatch sync-jobs          # pull new jobs from LinkedIn (no assessment)
 uv run jobwatch assess-jobs        # assess stored jobs
 uv run jobwatch assess-jobs 42     # (re)assess a single job by ID

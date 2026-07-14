@@ -1,4 +1,4 @@
-"""CLI entry points: `worker` (scheduled pipeline) is the long-running mode;
+"""CLI entry points: `worker` (awa task queue) is the long-running mode;
 `sync-jobs` and `assess-jobs` run individual pipeline steps. The web UI is
 served separately with `fastapi dev` (or uvicorn in Docker)."""
 
@@ -21,34 +21,10 @@ def app() -> None:
 
 @app.command()
 def worker() -> None:
-    """Run the scrape -> assess -> notify pipeline on a schedule, forever."""
-    from datetime import UTC
+    """Run the awa task-queue worker: syncs jobs every hour, forever."""
+    from jobwatch.tasks import run_worker
 
-    from apscheduler.schedulers.blocking import BlockingScheduler
-
-    from jobwatch.config import config
-    from jobwatch.db import session_maker
-    from jobwatch.llm import make_llm_client
-    from jobwatch.models import utcnow
-    from jobwatch.pipeline import run_pipeline
-
-    def pipeline_tick() -> None:
-        with session_maker() as session:
-            asyncio.run(run_pipeline(session, make_llm_client()))
-
-    # Explicit UTC avoids tzlocal(), which fails on POSIX-style TZ values
-    # (e.g. "CEST-2"); interval jobs don't need local time.
-    scheduler = BlockingScheduler(timezone=UTC)
-    scheduler.add_job(
-        pipeline_tick,
-        "interval",
-        minutes=config.schedule.interval_minutes,
-        next_run_time=utcnow(),  # first run at startup, then on the interval
-        max_instances=1,
-        coalesce=True,
-    )
-    click.echo(f"Worker started: pipeline every {config.schedule.interval_minutes} min")
-    scheduler.start()
+    asyncio.run(run_worker())
 
 
 @app.command("sync-jobs")
