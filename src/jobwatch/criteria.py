@@ -1,27 +1,34 @@
-"""The criteria text lives in the DB, edited via the web UI at /settings.
+"""Criteria text lives on User rows, edited via the web UI at /settings.
 
-It's blank until configured there — there's no config.toml seed for it.
+The worker pipeline is still effectively single-user: it assesses against the
+first user's criteria.
 """
 
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jobwatch.models import Setting
+from jobwatch.models import User
 
-CRITERIA_KEY = "criteria_text"
+
+def first_user(session: Session) -> User | None:
+    return session.scalars(select(User).order_by(User.id)).first()
 
 
 def get_criteria_text(session: Session) -> str:
-    """Return the stored criteria text ("" if never configured)."""
-    setting = session.get(Setting, CRITERIA_KEY)
-    return setting.value if setting else ""
+    """Return the first user's criteria text ("" if there are no users)."""
+    user = first_user(session)
+    return user.criteria_text if user else ""
 
 
-def set_criteria_text(session: Session, text: str) -> None:
-    setting = session.get(Setting, CRITERIA_KEY)
-    if setting is None:
-        session.add(Setting(key=CRITERIA_KEY, value=text))
-    else:
-        setting.value = text
+def set_criteria_text(session: Session, text: str, user: User | None = None) -> None:
+    """Set criteria on the given user, defaulting to the first user — created
+    if there are none yet, so a fresh install can save criteria right away."""
+    if user is None:
+        user = first_user(session)
+    if user is None:
+        user = User(name="Default")
+        session.add(user)
+    user.criteria_text = text
     session.commit()

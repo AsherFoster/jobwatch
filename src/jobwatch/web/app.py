@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, selectinload
 
-from jobwatch.criteria import get_criteria_text, set_criteria_text
+from jobwatch.criteria import set_criteria_text
 from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
 from jobwatch.models import (
@@ -139,17 +139,18 @@ def mark_applied(request: Request, job: JobDep, session: SessionDep):
 
 
 @app.post("/jobs/{job_id}/reassess")
-async def reassess(job: JobDep, session: SessionDep):
+async def reassess(job: JobDep, session: SessionDep, user_nav: UserNavDep):
     if assessment := job.active_assessment:
         assessment.invalidated_at = utcnow()
         session.expire(job, ["active_assessment"])
 
+    user = user_nav["current_user"]
     llm = make_llm_client()
     await assess_single(
         session,
         llm,
         job,
-        criteria_text=get_criteria_text(session),
+        criteria_text=user.criteria_text if user else "",
     )
 
     session.commit()
@@ -162,7 +163,9 @@ def settings(request: Request, session: SessionDep, user_nav: UserNavDep, saved:
         request,
         "settings.html",
         {
-            "criteria_text": get_criteria_text(session),
+            "criteria_text": user_nav["current_user"].criteria_text
+            if user_nav["current_user"]
+            else "",
             "searches": session.scalars(select(UserSearch).order_by(UserSearch.id)).all(),
             "saved": saved,
             "show": "settings",
@@ -177,8 +180,8 @@ def criteria_redirect():
 
 
 @app.post("/settings/criteria")
-def save_criteria(session: SessionDep, text: str = Form("")):
-    set_criteria_text(session, text)
+def save_criteria(session: SessionDep, user_nav: UserNavDep, text: str = Form("")):
+    set_criteria_text(session, text, user=user_nav["current_user"])
     return RedirectResponse("/settings?saved=criteria", status_code=303)
 
 

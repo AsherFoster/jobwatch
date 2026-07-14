@@ -116,16 +116,6 @@ class UserSearch(Base):
     location: Mapped[str]
 
 
-class Setting(Base):
-    """Key/value store for settings edited at runtime, e.g. the criteria text."""
-
-    __tablename__ = "settings"
-
-    key: Mapped[str] = mapped_column(primary_key=True)
-    value: Mapped[str]
-    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
-
-
 class Assessment(Base):
     __tablename__ = "assessments"
 
