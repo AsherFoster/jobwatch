@@ -28,6 +28,8 @@
     .search-form label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8em; }
     .search-form input { font: inherit; padding: 0.3rem; }
     .search-form input[type="number"] { width: 6rem; }
+    .user-select { margin-left: auto; }
+    .user-select select { font: inherit; padding: 0.2rem; }
   </style>
 </head>
 <body>
@@ -38,6 +40,15 @@
     <a href="/?show=saved" class="{{ 'active' if show == 'saved' else '' }}">Saved</a>
     <a href="/?show=all" class="{{ 'active' if show == 'all' else '' }}">All</a>
     <a href="/settings" class="{{ 'active' if show == 'settings' else '' }}">Settings</a>
+    {% if users %}
+    <form method="post" action="/user" class="user-select">
+      <select name="user_id" onchange="this.form.submit()">
+        {% for user in users %}
+        <option value="{{ user.id }}" {{ 'selected' if current_user and user.id == current_user.id }}>{{ user.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
   </nav>
   {% block content %}{% endblock %}
 </body>

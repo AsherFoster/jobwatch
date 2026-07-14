@@ -17,7 +17,15 @@ from sqlalchemy.orm import Session, selectinload
 from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
-from jobwatch.models import MATCHED_MIN_SCORE, Assessment, Job, UserJobState, UserSearch, utcnow
+from jobwatch.models import (
+    MATCHED_MIN_SCORE,
+    Assessment,
+    Job,
+    User,
+    UserJobState,
+    UserSearch,
+    utcnow,
+)
 from jobwatch.pipeline import assess_single
 from jobwatch.user_state import set_job_applied, set_job_bookmarked, set_job_rating
 
@@ -37,11 +45,33 @@ def get_job(job_id: int, session: SessionDep) -> Job:
 JobDep = Annotated[Job, Depends(get_job)]
 
 
+def user_nav(request: Request, session: SessionDep) -> dict:
+    """Template context for the nav user dropdown: all users plus the one
+    selected via the user_id cookie (first user if unset or stale)."""
+    users = session.scalars(select(User).order_by(User.id)).all()
+    selected = request.cookies.get("user_id", "")
+    current = next(
+        (u for u in users if selected.isdigit() and u.id == int(selected)),
+        users[0] if users else None,
+    )
+    return {"users": users, "current_user": current}
+
+
+UserNavDep = Annotated[dict, Depends(user_nav)]
+
+
 app = FastAPI(title="jobwatch")
 
 
+@app.post("/user")
+def select_user(request: Request, user_id: Annotated[int, Form()]):
+    response = RedirectResponse(request.headers.get("referer", "/"), status_code=303)
+    response.set_cookie("user_id", str(user_id))
+    return response
+
+
 @app.get("/", response_class=HTMLResponse)
-def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
+def list_jobs(request: Request, session: SessionDep, user_nav: UserNavDep, show: str = "matched"):
     query = (
         select(Job)
         .options(
@@ -69,13 +99,13 @@ def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
     return templates.TemplateResponse(
         request,
         "jobs.html",
-        {"jobs": jobs, "show": show},
+        {"jobs": jobs, "show": show, **user_nav},
     )
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-def job_detail(request: Request, job: JobDep):
-    return templates.TemplateResponse(request, "job.html", {"job": job})
+def job_detail(request: Request, job: JobDep, user_nav: UserNavDep):
+    return templates.TemplateResponse(request, "job.html", {"job": job, **user_nav})
 
 
 @app.put("/jobs/{job_id}/rating")
@@ -127,7 +157,7 @@ async def reassess(job: JobDep, session: SessionDep):
 
 
 @app.get("/settings", response_class=HTMLResponse)
-def settings(request: Request, session: SessionDep, saved: str = ""):
+def settings(request: Request, session: SessionDep, user_nav: UserNavDep, saved: str = ""):
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -136,6 +166,7 @@ def settings(request: Request, session: SessionDep, saved: str = ""):
             "searches": session.scalars(select(UserSearch).order_by(UserSearch.id)).all(),
             "saved": saved,
             "show": "settings",
+            **user_nav,
         },
     )
 
