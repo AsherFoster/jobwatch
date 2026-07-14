@@ -6,8 +6,9 @@ import pytest
 from sqlalchemy import select
 
 from jobwatch.llm import Verdict
-from jobwatch.models import Assessment, Job, User, utcnow
+from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.pipeline.assess import assess_pending, assess_single, get_unassessed_job
+from jobwatch.test_scene import Scene
 from jobwatch.typing import unwrap
 
 
@@ -24,8 +25,8 @@ class FakeLLM:
 
 
 @pytest.mark.asyncio
-async def test_assess_single_stores_the_verdict(session, add_job):
-    job = add_job("1")
+async def test_assess_single_stores_the_verdict(session, scene: Scene):
+    job = scene.job()
 
     verdict = await assess_single(session, FakeLLM(score=4), job, "criteria")
     session.commit()
@@ -40,13 +41,14 @@ async def test_assess_single_stores_the_verdict(session, add_job):
 
 
 @pytest.mark.asyncio
-async def test_assess_pending_assesses_every_unassessed_job(session, add_job, user: User):
-    jobs = [add_job(str(i)) for i in range(3)]
+async def test_assess_pending_assesses_every_unassessed_job(session, scene: Scene):
+    search = scene.user_search()
+    jobs = [scene.job(search=search) for _ in range(3)]
     llm = FakeLLM()
 
     assert await assess_pending(session, llm) == 3
 
-    assert llm.criteria_seen == [user.criteria_text] * 3
+    assert llm.criteria_seen == [search.user.criteria_text] * 3
     for job in jobs:
         assert job.active_assessment is not None
 
@@ -56,20 +58,20 @@ async def test_assess_pending_assesses_every_unassessed_job(session, add_job, us
 
 
 @pytest.mark.asyncio
-async def test_invalidated_verdict_is_reassessed_and_kept_as_history(session, add_job):
-    job = add_job("1")
+async def test_invalidated_verdict_is_reassessed_and_kept_as_history(session, scene: Scene):
+    job = scene.job()
     await assess_pending(session, FakeLLM(score=2))
-    job.active_assessment.invalidated_at = utcnow()
+    unwrap(job.active_assessment).invalidated_at = utcnow()
     session.commit()
 
     assert await assess_pending(session, FakeLLM(score=5)) == 1
 
     assert len(job.all_assessments) == 2
-    assert job.active_assessment.score == 5
+    assert unwrap(job.active_assessment).score == 5
 
 
-def test_get_unassessed_job_picks_the_oldest_scrape_first(session, add_job):
-    add_job("newer", scraped_at=utcnow())
-    older = add_job("older", scraped_at=utcnow() - timedelta(hours=2))
+def test_get_unassessed_job_picks_the_oldest_scrape_first(session, scene: Scene):
+    scene.job(scraped_at=utcnow())
+    older = scene.job(scraped_at=utcnow() - timedelta(hours=2))
 
     assert unwrap(get_unassessed_job(session)).id == older.id
