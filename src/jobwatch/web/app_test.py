@@ -9,9 +9,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jobwatch.criteria import set_criteria_text
 from jobwatch.llm import Verdict
-from jobwatch.models import Job, UserJobState, UserSearch
+from jobwatch.models import Job, User, UserJobState, UserSearch
 from jobwatch.web.app import app, get_session
 
 
@@ -23,14 +22,51 @@ class FakeLLM:
 
 
 @pytest.fixture
-def client(session: Session, monkeypatch) -> TestClient:
+def user(session: Session) -> User:
+    user = User(name="Test")
+    session.add(user)
+    session.commit()
+    return user
+
+
+@pytest.fixture
+def client(session: Session, user: User, monkeypatch) -> TestClient:
     monkeypatch.setattr("jobwatch.web.app.make_llm_client", lambda: FakeLLM())
 
     def override_get_session() -> Iterator[Session]:
         yield session
 
     app.dependency_overrides[get_session] = override_get_session
-    return TestClient(app)
+    client = TestClient(app)
+    client.cookies.set("user_id", str(user.id))
+    return client
+
+
+def test_no_user_cookie_redirects_to_user_picker(client):
+    client.cookies.delete("user_id")
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/users"
+
+    response = client.get("/users")
+    assert response.status_code == 200
+    assert "Create" in response.text
+
+
+def test_creating_user_selects_it(client, session: Session):
+    client.cookies.delete("user_id")
+    response = client.post("/users", data={"name": "Beth"}, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/"
+
+    beth = session.scalars(select(User).where(User.name == "Beth")).one()
+    assert response.cookies["user_id"] == str(beth.id)
+
+
+def test_selecting_user_sets_cookie(client, session: Session, user: User):
+    response = client.post("/user", data={"user_id": str(user.id)}, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.cookies["user_id"] == str(user.id)
 
 
 def test_settings_page_starts_blank(client):
@@ -155,14 +191,17 @@ def _add_job(
     return job.id
 
 
-def test_reassess_creates_new_verdict_and_keeps_old_as_history(client, session: Session):
+def test_reassess_creates_new_verdict_and_keeps_old_as_history(
+    client, session: Session, user: User
+):
     job_id = _add_job(session)
 
     response = client.post(f"/jobs/{job_id}/reassess")
     assert response.status_code == 200  # followed the redirect to the job page
     assert "current" in response.text
 
-    set_criteria_text(session, "Completely different criteria")
+    user.criteria_text = "Completely different criteria"
+    session.commit()
 
     response = client.post(f"/jobs/{job_id}/reassess")
     assert response.status_code == 200

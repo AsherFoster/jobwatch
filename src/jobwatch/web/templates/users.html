@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Users · jobwatch{% endblock %}
+{% block content %}
+<h2>Who's job hunting?</h2>
+{% if users %}
+<div class="user-picker">
+  {% for u in users %}
+  <form method="post" action="/user">
+    <input type="hidden" name="user_id" value="{{ u.id }}">
+    <button type="submit">{{ u.name }}</button>
+  </form>
+  {% endfor %}
+</div>
+<h3>New user</h3>
+{% else %}
+<p class="muted">Create a user to get started.</p>
+{% endif %}
+<form method="post" action="/users" class="search-form">
+  <label>Name <input name="name" placeholder="Asher" required></label>
+  <button type="submit">Create</button>
+</form>
+{% endblock %}
