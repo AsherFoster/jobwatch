@@ -10,6 +10,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, selectinload
@@ -66,6 +67,8 @@ def nav_context(session: Session, user: User) -> dict:
 
 
 app = FastAPI(title="jobwatch")
+
+app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
 
 @app.exception_handler(NoUserSelected)
