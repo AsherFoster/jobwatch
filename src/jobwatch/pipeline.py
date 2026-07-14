@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 from datetime import UTC
+from urllib.parse import urlparse
 
 import structlog
 from sqlalchemy import func, select
@@ -39,23 +40,53 @@ async def generate_company_description(company: str) -> str:
     return await gemini.generate_company_description(company)
 
 
+def linkedin_company_slug(url: str | None) -> str | None:
+    """Extract the slug from a LinkedIn company URL, e.g.
+    https://dk.linkedin.com/company/too-good-to-go -> too-good-to-go."""
+    if not url:
+        return None
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    if host != "linkedin.com" and not host.endswith(".linkedin.com"):
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) < 2 or parts[0] != "company":
+        return None
+    return parts[1].lower()
+
+
 async def ensure_company_details(session: Session, item: ScrapedJob) -> None:
     """Create a CompanyDetails row for this job's company, unless one exists.
 
-    A failed generation is logged and skipped — no row is created, so the next
-    job from that company retries."""
-    exists = session.scalar(
-        select(CompanyDetails.id).where(CompanyDetails.name.ilike(item.company))
-    )
-    if exists:
+    An existing company is matched by its LinkedIn slug when the scrape
+    provides one, falling back to a case-insensitive name match (which also
+    backfills the slug on rows that predate it). A failed generation is
+    logged and skipped — no row is created, so the next job from that
+    company retries."""
+    raw = json.loads(item.raw)
+    slug = linkedin_company_slug(raw.get("company_url"))
+    existing = None
+    if slug:
+        existing = session.scalar(
+            select(CompanyDetails).where(CompanyDetails.linkedin_slug == slug)
+        )
+    if existing is None:
+        existing = session.scalar(
+            select(CompanyDetails).where(CompanyDetails.name.ilike(item.company))
+        )
+        if existing is not None and existing.linkedin_slug is None:
+            existing.linkedin_slug = slug
+    if existing is not None:
         return
     try:
         description = await generate_company_description(item.company)
     except Exception:
         log.exception("Description generation failed", company=item.company)
         return
-    logo = json.loads(item.raw).get("company_logo") or None
-    session.add(CompanyDetails(name=item.company, logo=logo, description=description))
+    logo = raw.get("company_logo") or None
+    session.add(
+        CompanyDetails(name=item.company, linkedin_slug=slug, logo=logo, description=description)
+    )
 
 
 async def store_new_jobs(session: Session, search: UserSearch, scraped: list[ScrapedJob]) -> int:

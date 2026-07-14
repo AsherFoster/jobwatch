@@ -11,7 +11,7 @@ import jobwatch.pipeline as pipeline_module
 from jobwatch.assess import Verdict
 from jobwatch.models import Assessment, CompanyDetails, Job, User, UserSearch, utcnow
 from jobwatch.notify import NullNotifier
-from jobwatch.pipeline import assess_single, hours_to_search, run_pipeline
+from jobwatch.pipeline import assess_single, hours_to_search, linkedin_company_slug, run_pipeline
 from jobwatch.search_jobs import JobSource, ScrapedJob
 
 
@@ -28,17 +28,19 @@ def fake_source(search_function) -> JobSource:
     return JobSource(id="fake", name="Fake", search_function=search_function)
 
 
-def scraped(external_id: str, title: str = "Backend Engineer") -> ScrapedJob:
+def scraped(
+    external_id: str, title: str = "Backend Engineer", company: str = "Acme", raw: str = "{}"
+) -> ScrapedJob:
     return ScrapedJob(
         site="linkedin",
         external_id=external_id,
         title=title,
-        company="Acme",
+        company=company,
         location="Copenhagen",
         url=f"https://example.com/{external_id}",
         description="Python things",
         posted_at=None,
-        raw="{}",
+        raw=raw,
     )
 
 
@@ -111,6 +113,42 @@ def test_new_jobs_create_company_details_once_per_company(session, monkeypatch):
     # More jobs from a known company don't create another row.
     run(session, FakeLLM(), [scraped("3")], monkeypatch)
     assert len(session.scalars(select(CompanyDetails)).all()) == 1
+
+
+def test_linkedin_company_slug():
+    assert linkedin_company_slug("https://dk.linkedin.com/company/too-good-to-go") == (
+        "too-good-to-go"
+    )
+    assert linkedin_company_slug("https://www.linkedin.com/company/Acme/") == "acme"
+    assert linkedin_company_slug("https://linkedin.com/company/acme?trk=x") == "acme"
+    assert linkedin_company_slug("https://example.com/company/acme") is None
+    assert linkedin_company_slug("https://dk.linkedin.com/jobs/view/123") is None
+    assert linkedin_company_slug("https://dk.linkedin.com/company/") is None
+    assert linkedin_company_slug("") is None
+    assert linkedin_company_slug(None) is None
+
+
+def test_companies_match_by_linkedin_slug_despite_name_differences(session, monkeypatch):
+    raw = '{"company_url": "https://dk.linkedin.com/company/acme"}'
+    run(session, FakeLLM(), [scraped("1", company="Acme", raw=raw)], monkeypatch)
+
+    details = session.scalars(select(CompanyDetails)).one()
+    assert details.linkedin_slug == "acme"
+
+    # Same slug under a different name and subdomain: no second row.
+    raw = '{"company_url": "https://www.linkedin.com/company/acme"}'
+    run(session, FakeLLM(), [scraped("2", company="Acme ApS", raw=raw)], monkeypatch)
+    assert len(session.scalars(select(CompanyDetails)).all()) == 1
+
+
+def test_name_match_backfills_missing_linkedin_slug(session, monkeypatch):
+    run(session, FakeLLM(), [scraped("1")], monkeypatch)  # no company_url in raw
+    assert session.scalars(select(CompanyDetails)).one().linkedin_slug is None
+
+    raw = '{"company_url": "https://dk.linkedin.com/company/acme"}'
+    run(session, FakeLLM(), [scraped("2", raw=raw)], monkeypatch)
+    details = session.scalars(select(CompanyDetails)).one()
+    assert details.linkedin_slug == "acme"
 
 
 def test_company_description_failure_does_not_block_jobs(session, monkeypatch):

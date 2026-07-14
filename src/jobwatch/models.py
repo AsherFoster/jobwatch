@@ -95,10 +95,16 @@ class CompanyDetails(Base):
     company is stored."""
 
     __tablename__ = "company_details"
-    __table_args__ = (UniqueConstraint("name", name="uq_company_details_name"),)
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_company_details_name"),
+        UniqueConstraint("linkedin_slug", name="uq_company_details_linkedin_slug"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
+    # Slug from the company's LinkedIn URL (e.g. "too-good-to-go"), the most
+    # reliable identifier we get from scraped jobs.
+    linkedin_slug: Mapped[str | None]
     logo: Mapped[str | None]  # URL, when the job source provides one
     description: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
