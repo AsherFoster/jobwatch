@@ -16,7 +16,6 @@ diligence anyway:
 
 ```bash
 docker compose up -d                 # Postgres on :5432
-export ENVIRONMENT=test
 uv run pytest                        # also creates/resets the jobwatch_test schema
 uv run fastapi dev --port 8391 &     # app path comes from pyproject [tool.fastapi]
 ```
