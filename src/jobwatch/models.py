@@ -106,14 +106,17 @@ class CompanyDetails(Base):
 
 class UserSearch(Base):
     """A saved job-board search the worker runs every cycle, and the parameters
-    handed to each job source. Single-user for now — gains a user_id if
-    multiple users arrive."""
+    handed to each job source."""
 
     __tablename__ = "user_searches"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # The user who owns this search; null for searches predating users.
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     search_term: Mapped[str]
     location: Mapped[str]
+
+    user: Mapped[User | None] = relationship()
 
 
 class Assessment(Base):

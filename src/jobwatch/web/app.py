@@ -206,7 +206,9 @@ UserSearchDep = Annotated[UserSearch, Depends(get_user_search)]
 
 
 @app.post("/settings/searches")
-def add_search(session: SessionDep, search: SearchFormDep):
+def add_search(session: SessionDep, search: SearchFormDep, user_nav: UserNavDep):
+    if user := user_nav["current_user"]:
+        search.user_id = user.id
     session.add(search)
     session.commit()
     return RedirectResponse("/settings?saved=searches", status_code=303)
