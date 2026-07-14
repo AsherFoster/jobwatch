@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, MetaData, Text, UniqueConstraint, and_, text
+from sqlalchemy import DateTime, ForeignKey, Index, Text, UniqueConstraint, and_, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -17,8 +17,6 @@ MATCHED_MIN_SCORE = 4
 
 
 class Base(DeclarativeBase):
-    # Names constraints from unique=True to match the migration history.
-    metadata = MetaData(naming_convention={"uq": "uq_%(table_name)s_%(column_0_name)s"})
     type_annotation_map = {
         str: Text,
         datetime: DateTime(timezone=True),
@@ -37,7 +35,7 @@ class User(Base):
 
 class Job(Base):
     __tablename__ = "jobs"
-    __table_args__ = (UniqueConstraint("site", "external_id", name="uq_job_site_external_id"),)
+    __table_args__ = (UniqueConstraint("site", "external_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     site: Mapped[str]
