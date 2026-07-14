@@ -4,7 +4,7 @@ from typing import Annotated
 import structlog
 from google import genai
 from google.genai.interactions import Interaction
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from jobwatch.config import config
 from jobwatch.llm import Verdict
@@ -42,15 +42,36 @@ async def generate_company_description(company: str) -> str:
 
 
 class GeminiVerdict(BaseModel):
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
     summary: str
-    """Exactly 1 sentence objectively summarising the job"""
+    """
+    1 line objectively summarising the job. Assume title, company, and location are already explained.
+    
+    Bad: Software Engineer at Example Corp in Copenhagen, a company focussed on widgets
+    Good: Backend focussed role in the Operations team, focussed on integrations, with on-call responsibilities.
+    """
     summary_positives: str
-    """Exactly 1 sentence summarising why this job would be a good fit for the job seeker """
+    """
+    1 line summarising summarising why is this role a good fit for the job seeker.
+    Must be very direct, brief, and to the point. Don't pad - only mention notable upsides.
+    
+    Bad: This role would be good for the job seeker because it matches their preferred language of Python
+    Good: Python & TypeScript focussed, relocation support offered, high autonomy.
+    """
     summary_negatives: str
-    """Exactly 1 sentence summarising why this job would NOT be a good fit for the job seeker """
+    """
+    1 line summarising why this job would NOT be a good fit for the job seeker.
+    Must be very direct, brief, and to the point. Don't pad - only mention notable downsides.
+    
+    Bad: The role requires security clearance, which may present a significant hurdle or disqualification.
+    Good: Requires NATO clearance (ineligible) and Rust experience.  
+    """
 
     reasoning: str
-    """2 sentences of reasoning behind how this job is scored"""
+    """
+    2 sentences of reasoning behind how this job is scored. Should be direct and to the point, with no filler.
+    """
 
     score: Annotated[int, Field(strict=True, ge=1, le=5)]
     """
@@ -67,8 +88,12 @@ class GeminiClient:
 
     async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
         system_prompt = """
-You screen job postings for a job seeker. You are given their criteria and one job posting.
-Decide whether the posting is worth their time to review.
+You are a job reviewer, screening job postings for a job seeker. Given their criteria and a single job posting,
+explain whether this job is relevant to them or not, and worth their time reviewing further.
+
+Responses should be directed _at_ the job seeker, and should be brief and direct.
+
+Avoid explaining the obvious. Do not say "requires Rust experience, which you do not have", instead just say "requires Rust experience" 
         """
 
         clean_description = re.sub(r"\n+", "\n", re.sub(r" +", " ", job.description))

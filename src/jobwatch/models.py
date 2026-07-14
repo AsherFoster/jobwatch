@@ -58,7 +58,7 @@ class Job(Base):
     """Set once a notification that includes this job has been sent, so a job is
     never announced twice — even if changed criteria make it match again later."""
 
-    all_assessments: Mapped[list[Assessment]] = relationship(
+    assessments: Mapped[list[Assessment]] = relationship(
         back_populates="job", order_by="Assessment.created_at"
     )
     """Every verdict ever produced for this job, oldest first."""
@@ -69,11 +69,15 @@ class Job(Base):
     )
     """The current verdict (may predate the latest criteria/model if this job
     hasn't been reevaluated since they last changed)."""
+
+    past_assessments: Mapped[list[Assessment]] = relationship(
+        primaryjoin=lambda: and_(
+            Job.id == Assessment.job_id, Assessment.invalidated_at.isnot(None)
+        ),
+        viewonly=True,
+    )
     user_state: Mapped[UserJobState | None] = relationship(back_populates="job")
     """The user's rating/bookmark/applied state, if they've touched this job."""
-
-    def latest_assessment(self) -> Assessment | None:
-        return self.all_assessments[-1] if self.all_assessments else None
 
 
 class UserJobState(Base):
@@ -144,7 +148,7 @@ class Assessment(Base):
     supersedes this one. Invalidated rows are kept as history — never deleted
     — but only the row with invalidated_at IS NULL is "the" current verdict."""
 
-    job: Mapped[Job] = relationship(back_populates="all_assessments")
+    job: Mapped[Job] = relationship(back_populates="assessments")
 
     @property
     def matched(self) -> bool:

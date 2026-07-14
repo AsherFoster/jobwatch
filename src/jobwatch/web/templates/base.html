@@ -1,19 +1,26 @@
 {% extends "base_anonymous.html" %}
 {% block full_content %}
-<nav>
-  <strong>jobwatch</strong>
-  <a href="/?show=matched" class="{{ 'active' if show == 'matched' else '' }}">Matched</a>
-  <a href="/?show=unmatched" class="{{ 'active' if show == 'unmatched' else '' }}">Unmatched</a>
-  <a href="/?show=saved" class="{{ 'active' if show == 'saved' else '' }}">Saved</a>
-  <a href="/?show=all" class="{{ 'active' if show == 'all' else '' }}">All</a>
-  <a href="/settings" class="{{ 'active' if show == 'settings' else '' }}">Settings</a>
-  <form method="post" action="/user" class="user-select">
-    <select name="user_id" onchange="this.form.submit()">
-      {% for u in users %}
-      <option value="{{ u.id }}" {{ 'selected' if u.id == user.id }}>{{ u.name }}</option>
-      {% endfor %}
-    </select>
-  </form>
+<nav class="navbar navbar-expand-lg bg-primary-subtle">
+    <div class="container">
+        <a class="navbar-brand" href="#">Jobwatch</a>
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item">
+                <a href="/?show=matched" class="nav-link">Matched</a>
+            </li>
+            <li class="nav-item">
+                <a href="/?show=unmatched" class="nav-link">Unmatched</a>
+            </li>
+            <li class="nav-item">
+                <a href="/?show=saved" class="nav-link">Bookmarked</a>
+            </li>
+            <li class="nav-item">
+                <a href="/?show=all" class="nav-link">All</a>
+            </li>
+        </ul>
+        <a href="/settings" class="nav-link">Settings</a>
+    </div>
 </nav>
-{% block content %}{% endblock %}
+<div class="container">
+    {% block content %}{% endblock %}
+</div>
 {% endblock %}

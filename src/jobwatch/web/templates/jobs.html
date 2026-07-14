@@ -1,40 +1,41 @@
 {% extends "base.html" %}
 {% block content %}
-<table>
-  <thead>
-    <tr><th>Job</th><th>Location</th><th>Verdict</th><th>Yours</th><th>Scraped</th></tr>
-  </thead>
-  <tbody>
+<table class="table">
+    <thead>
+    <tr>
+        <th>Job</th>
+        <th colspan="2">Verdict</th>
+    </tr>
+    </thead>
+    <tbody>
     {% for job in jobs %}
     {% set current = job.active_assessment %}
     <tr>
-      <td>
-        <a href="/jobs/{{ job.id }}">{{ job.title }}</a>
-        <div class="muted">{{ job.company }}{% if job.search %} · {{ job.search.search_term }}{% endif %}</div>
-      </td>
-      <td>{{ job.location }}</td>
-      <td>
+        <td>
+            <a href="/jobs/{{ job.id }}">{{ job.title }}</a>
+            <div class="text-secondary">{{ job.company }} · {{ job.location }}</div>
+        </td>
         {% if current %}
-          <span class="badge {{ 'yes' if current.matched else 'no' }}">
-            {{ 'match' if current.matched else 'no match' }}</span>
-          <span class="stars" title="{{ current.score }}/5">{{ '★' * current.score }}{{ '☆' * (5 - current.score) }}</span>
+        <td>
+            <span class="stars"
+                  title="{{ current.score }}/5">{{ '⭐' * current.score }}{{ '☆' * (5 - current.score) }}</span>
+        </td>
+        <td>
+            <p class="text-success">{{ current.summary_positives }}</p>
+            <p class="text-danger">{{ current.summary_negatives }}</p>
+        </td>
         {% else %}
-          <span class="badge pending">pending</span>
+        <td colspan="2">
+            <span class="badge pending">pending</span>
+        </td>
         {% endif %}
-      </td>
-      <td>
-        {% set state = job.user_state %}
-        {% if state %}
-          {% if state.rating %}<span class="stars" title="Your rating: {{ state.rating }}/5">{{ '★' * state.rating }}</span>{% endif %}
-          {% if state.bookmarked_at %}<span title="Saved">🔖</span>{% endif %}
-          {% if state.applied_at %}<span class="badge yes">applied</span>{% endif %}
-        {% endif %}
-      </td>
-      <td class="muted">{{ job.scraped_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>
     </tr>
     {% else %}
-    <tr><td colspan="5" class="muted">No jobs yet.</td></tr>
+    <tr>
+        <td colspan="5" class="muted">No jobs yet.</td>
+    </tr>
     {% endfor %}
-  </tbody>
+    </tbody>
 </table>
 {% endblock %}

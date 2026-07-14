@@ -65,7 +65,7 @@ async def test_invalidated_verdict_is_reassessed_and_kept_as_history(session, sc
 
     assert await assess_pending(session, FakeLLM(score=5)) == 1
 
-    assert len(job.all_assessments) == 2
+    assert len(job.assessments) == 2
     assert unwrap(job.active_assessment).score == 5
 
 

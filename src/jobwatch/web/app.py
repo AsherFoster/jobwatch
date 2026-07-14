@@ -106,7 +106,7 @@ def list_jobs(request: Request, session: SessionDep, user: UserDep, show: str = 
     query = (
         select(Job)
         .options(
-            selectinload(Job.all_assessments),
+            selectinload(Job.assessments),
             selectinload(Job.active_assessment),
             selectinload(Job.user_state),
             selectinload(Job.search),

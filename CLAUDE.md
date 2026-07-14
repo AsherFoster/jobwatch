@@ -4,6 +4,8 @@ Before making changes, create a git worktree. Never edit ~/src/jobwatch directly
 
 Never create a PR without instruction from the user.
 
+Web UI uses bootstrap for styling
+
 ## Code style
 
 - Models are defined using SQLAlchemy 2.0 type annotations - don't add `mapped_column` if it's not needed
