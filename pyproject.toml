@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.18.5",
-    "apscheduler>=3.11.3",
+    "awa-pg>=0.6.2",
     "click>=8.1",
     "fastapi[standard]>=0.139.0",
     "google-genai>=2.11.0",

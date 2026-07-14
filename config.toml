@@ -16,8 +16,5 @@ model = "gemini-3.1-flash-lite"
 # [notify.discord]
 # webhook_url = "https://discord.com/api/webhooks/CHANGE-ME"
 
-[schedule]
-interval_minutes = 60
-
 [web]
 base_url = "http://localhost:8000"  # used for the "review all" link in notifications

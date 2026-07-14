@@ -41,10 +41,6 @@ class NotifyConfig(BaseModel):
     discord: DiscordConfig | None = None
 
 
-class ScheduleConfig(BaseModel):
-    interval_minutes: int = 60
-
-
 class WebConfig(BaseModel):
     # Used to build links in notifications; set to how *you* reach the UI.
     base_url: str
@@ -61,7 +57,6 @@ class Config(BaseSettings):
     anthropic: AnthropicConfig | None = None
     gemini: GeminiConfig | None = None
     notify: NotifyConfig = NotifyConfig()
-    schedule: ScheduleConfig
     web: WebConfig
 
     @classmethod
