@@ -1,6 +1,6 @@
 import re
 
-import apple_fm_sdk as fm
+import apple_fm_sdk as fm  # ty:ignore[unresolved-import,unused-ignore-comment]
 
 from jobwatch.llm import Verdict
 from jobwatch.models import Job

@@ -77,4 +77,5 @@ class Config(BaseSettings):
         return (TomlConfigSettingsSource(settings_cls, deep_merge=True),)
 
 
-config = Config()
+# Required fields are populated from the TOML sources, which ty can't see.
+config = Config()  # ty: ignore[missing-argument]
