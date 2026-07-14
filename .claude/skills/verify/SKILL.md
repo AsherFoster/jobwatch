@@ -41,7 +41,7 @@ with session_maker() as s:
 ## Gotchas
 
 - Everything except `pytest` needs `ENVIRONMENT` exported —
-  `jobwatch.config` asserts it at import time; conftest.py defaults it to
+  `jobwatch.config` asserts it at import time; conftest.py forces it to
   `test` for pytest.
 - Form POSTs answer 303; don't use `curl -L -X POST` — it re-POSTs the
   redirect target and 405s. Use `-d` (implies POST) or follow the Location

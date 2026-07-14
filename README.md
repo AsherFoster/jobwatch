@@ -29,7 +29,7 @@ uv run jobwatch worker            # scheduled pipeline (separate process)
 ```
 
 `ENVIRONMENT` must be one of `production`, `development`, or `test`. Every
-command needs it set, except `pytest` (conftest.py defaults it to `test`).
+command needs it set, except `pytest` (conftest.py forces it to `test`).
 
 The `Dockerfile` builds an image that serves the web UI with uvicorn;
 `docker-compose.yml` currently only runs Postgres.

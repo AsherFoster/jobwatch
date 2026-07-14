@@ -8,8 +8,9 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session
 
-os.environ.setdefault("ENVIRONMENT", "test")
-assert os.environ.get("ENVIRONMENT") == "test"
+# Force the test environment so tests can never run against another DB,
+# even when the shell exports a default ENVIRONMENT.
+os.environ["ENVIRONMENT"] = "test"
 
 # ruff: noqa: E402
 from jobwatch.config import config
