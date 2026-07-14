@@ -1,59 +1,19 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Generator
-from dataclasses import dataclass
-from datetime import datetime
-from urllib.parse import urlparse
 
 import structlog
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from jobwatch.job_sources import JOB_SOURCES
+from jobwatch.job_sources.base import ScrapedJob
 from jobwatch.models import Job, UserSearch, utcnow
 from jobwatch.pipeline.sync_companies import ensure_company_details
 
 log = structlog.get_logger()
 
-
-@dataclass
-class ScrapedJob:
-    site: str
-    external_id: str
-    title: str
-    company: str
-    location: str
-    url: str
-    description: str
-    posted_at: datetime | None
-    raw: str  # full record as JSON, for re-analysis
-
-
-@dataclass
-class JobSource:
-    id: str
-    name: str
-    # Yields jobs for a search, restricted to postings at most hours_old hours old.
-    search_function: Callable[[UserSearch, int], Generator[ScrapedJob]]
-
-
 DEFAULT_HOURS_OLD = 24
-
-
-def linkedin_company_slug(url: str | None) -> str | None:
-    """Extract the slug from a LinkedIn company URL, e.g.
-    https://dk.linkedin.com/company/too-good-to-go -> too-good-to-go."""
-    if not url:
-        return None
-    parsed = urlparse(url)
-    host = parsed.hostname or ""
-    if host != "linkedin.com" and not host.endswith(".linkedin.com"):
-        return None
-    parts = [part for part in parsed.path.split("/") if part]
-    if len(parts) < 2 or parts[0] != "company":
-        return None
-    return parts[1].lower()
 
 
 async def store_new_jobs(session: Session, search: UserSearch, scraped: list[ScrapedJob]) -> int:

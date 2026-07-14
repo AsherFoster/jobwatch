@@ -6,8 +6,9 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from jobwatch.job_sources.base import ScrapedJob
+from jobwatch.job_sources.linkedin import linkedin_company_slug
 from jobwatch.models import CompanyDetails
-from jobwatch.pipeline.sync_jobs import ScrapedJob, linkedin_company_slug
 
 log = structlog.get_logger()
 

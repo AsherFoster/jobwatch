@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
+from jobwatch.job_sources.base import JobSource
 from jobwatch.job_sources.linkedin import linkedin_source
-from jobwatch.pipeline.sync_jobs import JobSource
 
 JOB_SOURCES: list[JobSource] = [linkedin_source]

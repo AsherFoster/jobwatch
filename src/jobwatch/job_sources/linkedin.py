@@ -7,13 +7,29 @@ import json
 from collections.abc import Generator
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 
 import structlog
 
+from jobwatch.job_sources.base import JobSource, ScrapedJob
 from jobwatch.models import UserSearch
-from jobwatch.pipeline.sync_jobs import JobSource, ScrapedJob
 
 log = structlog.get_logger()
+
+
+def linkedin_company_slug(url: str | None) -> str | None:
+    """Extract the slug from a LinkedIn company URL, e.g.
+    https://dk.linkedin.com/company/too-good-to-go -> too-good-to-go."""
+    if not url:
+        return None
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    if host != "linkedin.com" and not host.endswith(".linkedin.com"):
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) < 2 or parts[0] != "company":
+        return None
+    return parts[1].lower()
 
 
 def _text(record: dict[str, Any], key: str) -> str:
