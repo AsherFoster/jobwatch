@@ -61,7 +61,6 @@ Decide whether the posting is worth their time to review.
 3: uncertain, doesn't appear to suit but may be worth a second look
 4 - 5: well suited, aligns well to the job seeker, with few downsides
         """
-        user_criteria = "# My criteria\n\n" + criteria_text
 
         clean_description = re.sub(r"\n+", "\n", re.sub(r" +", " ", job.description))
         job_details = f"""

@@ -1,3 +1,12 @@
+## Todos:
+
+- [x] Fix alembic foreign key hack, maybe postgres time?
+- [ ] Add company context from Google search
+- [ ] LLM-generated search queries
+- [ ] Refine LLM analysis
+- [ ] Multiple job indexers
+- [ ] Multi-user support
+
 I'm tired of trawling through hundreds of jobs on linkedin every day, looking for the odd one that is at all relevant. This problem is, in theory, easy to automate: regularly check for new job postings, use an LLM to assess them against my criteria, and then alert me if they match.
 
 ## Checking for new job listings
