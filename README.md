@@ -1,65 +1,54 @@
-## Todos:
+# jobwatch
+
+Scrapes LinkedIn job postings on a schedule, scores each one against your
+criteria with an LLM, and pings a Discord webhook when something matches.
+Jobs are stored in full (Postgres), so they can be re-assessed if the
+criteria change.
+
+Scraping uses JobSpy's anonymous LinkedIn view — no logged-in account at
+risk of a ban. Expected scale is a few hundred jobs per day across a handful
+of searches.
+
+## Todos
 
 - [x] Fix alembic foreign key hack, maybe postgres time?
-- [ ] Add company context from Google search
+- [x] Add company context from Google search
 - [ ] LLM-generated search queries
 - [ ] Refine LLM analysis
 - [ ] Multiple job indexers
 - [ ] Multi-user support
 
-I'm tired of trawling through hundreds of jobs on linkedin every day, looking for the odd one that is at all relevant. This problem is, in theory, easy to automate: regularly check for new job postings, use an LLM to assess them against my criteria, and then alert me if they match.
-
-## Checking for new job listings
-
-LinkedIn _does not like_ scraping, and I need to work around this - without putting my account at risk of a ban.
-
-To do this, I want to use an anonymous view of jobs, most likely with speedyapply/JobSpy.
-
-Expected scope: ~200 jobs per day, across 2-3 searches (eg "software engineer in Denmark")
-
-These jobs should be saved in full, supporting re-analysis if the requirements change.
-
-## Assessing jobs
-
-Given the text of a job description, this tool needs to decide if it's worth my time to review - and an LLM is the best tool for this job.
-
-For cost reasons, and since this isn't performance-critical, this will be run against Ollama running on an M1 Macbook.
-
-I'll define requirements in text that gets provided to the LLM (think "positives: python. negatives: data analysis")
-
-## Notify me
-
-Any time a new job is found, I'll need alerting. This could be done with either a Discord webhook, or potentially WebPush.
-
-I'll want one push notification even if multiple jobs are found: I should be able to go to a web page where I can see all the matched jobs (and unmatched, to audit)
-
-## Tech
-
-Assume this is hosted in Docker on a M1 Macbook. LLM is running in Ollama (ideally use an abstraction if I want to swap it for Anthropic etc)
-
-Code should be written in Python, using modern tools like uv, ty, and ruff.
-
-
 ## Getting started
 
 ```bash
-cp config.example.toml config.toml   # then edit: webhook URL, LLM
-uv sync
-uv run fastapi dev                   # web UI (app path comes from pyproject.toml)
-uv run jobwatch worker               # scheduled pipeline (separate process)
+docker compose up -d              # Postgres
+uv run alembic upgrade heads      # create the schema
+uv run fastapi dev                # web UI (app path comes from pyproject.toml)
+uv run jobwatch worker            # scheduled pipeline (separate process)
 ```
 
-Or in Docker (the intended deployment — runs `web` and `worker` as separate
-services):
+`ENVIRONMENT` must be one of `production`, `development`, or `test`. Every
+command needs it set, except `pytest` (conftest.py forces it to `test`).
 
-```bash
-docker compose up -d --build
-```
+The `Dockerfile` builds an image that serves the web UI with uvicorn;
+`docker-compose.yml` currently only runs Postgres.
 
-The UI is at http://localhost:8000 — matched jobs by default, with unmatched/all
-tabs for auditing. Jobs and every LLM verdict are stored in `data/jobwatch.db`.
-The criteria text is edited on the **Settings** tab (`/settings`); it lives in
-the database and starts blank — there's no config.toml seed for it.
+### Config
+
+Config is layered TOML, deep-merged in order: `config.toml` (checked-in
+defaults) → `config.{ENVIRONMENT}.toml` → `config.local.toml` (gitignored —
+put your webhook URL and API keys there). See `src/jobwatch/config.py` for
+the schema.
+
+## The web UI
+
+The UI is at http://localhost:8000 — matched jobs by default, with
+unmatched/all tabs for auditing. Jobs and every LLM verdict are stored in
+Postgres.
+
+The criteria text — free-form, e.g. "positives: python. negatives: data
+analysis" — is edited on the **Settings** tab (`/settings`); it lives in the
+database and starts blank.
 
 The searches also live in the database (one `user_searches` row per search —
 see the `UserSearch` model), and are managed on the same **Settings** tab.
@@ -72,10 +61,11 @@ Each job's page has controls for *your* take, separate from the LLM's verdict:
 a 1-5 star rating, a **Save** bookmark (saved jobs get their own tab), and a
 **Mark applied** toggle. These live in the `user_job_state` table
 (`UserJobState` in `models.py`) — one mutable row per job, unlike the
-append-only assessment history. Ratings are stored with an eye to eventually feeding them back
-into the LLM prompt as examples, but nothing uses them for that yet.
+append-only assessment history. Ratings are stored with an eye to eventually
+feeding them back into the LLM prompt as examples, but nothing uses them for
+that yet.
 
-### CLI
+## CLI
 
 ```bash
 uv run fastapi dev                 # web UI (no pipeline); Docker serves it with uvicorn
@@ -86,7 +76,7 @@ uv run jobwatch assess-jobs 42     # (re)assess a single job by ID
 uv run jobwatch test-notify        # verify the Discord webhook
 ```
 
-### How re-analysis works
+## How re-analysis works
 
 Saving new criteria on `/settings` only affects jobs assessed from then on — it does **not**
 retroactively re-run the backlog, so it's safe to tweak criteria without
@@ -97,32 +87,35 @@ reevaluated — they're kept, marked as superseded, so you can see how the
 verdict changed. Jobs are only ever *notified* once, so re-analysis won't
 re-ping you about jobs you've seen.
 
-### Database schema changes
+## Database schema changes
 
 See `migrations` skill
 
-### Swapping the LLM
+## LLM providers
 
-Set `[llm] provider = "anthropic"` and `model = "claude-haiku-4-5"` (install the
-extra with `uv sync --extra anthropic`, API key via `[anthropic] api_key` or
-`$ANTHROPIC_API_KEY`). The `LLMClient` protocol in `src/jobwatch/llm.py` is the
-seam for adding other providers.
+The provider is set with `[llm] provider` and `model` in config. The
+`LLMClient` protocol in `src/jobwatch/llm/__init__.py` is the seam for
+adding providers.
 
-For Gemini, set `[llm] provider = "gemini"` and `model = "gemini-2.5-flash"`
-(install the extra with `uv sync --extra gemini`, API key via `[gemini]
-api_key` or `$GEMINI_API_KEY`). This provider uses the Interactions API with a
-JSON-schema response format, so the verdict is schema-constrained.
+- `gemini` (the default) — `uv sync --extra gemini`, set `[gemini] api_key`.
+  Uses the Interactions API with a JSON-schema response format, so the
+  verdict is schema-constrained.
+- `ollama` — set `[ollama] base_url`.
+- `apple_fm` — Apple's on-device Foundation Models (Apple Silicon,
+  macOS 26+). `uv sync --extra apple-fm`; no API key, and `model` is ignored
+  (there's a single system model).
+- `anthropic` — `uv sync --extra anthropic`, set `[anthropic] api_key`.
+  The client exists but job assessment is not implemented yet.
 
-On Apple Silicon (macOS 26+), set `[llm] provider = "apple_fm"` to use Apple's
-on-device Foundation Models (install with `uv sync --extra apple-fm`; no API
-key, and `model` is ignored — there's a single system model). This provider
-uses the SDK's guided generation (`@fm.generable`), so the verdict is
-schema-constrained rather than parsed out of free-form JSON.
+Company descriptions (a one-sentence blurb generated the first time a
+company is seen — see `CompanyDetails`) always use Gemini with Google
+Search, regardless of the assessment provider.
 
-### Development
+## Development
 
 ```bash
-uv run pytest        # tests
-uv run ruff check .  # lint
-uv run ty check      # types
+uv run pytest         # tests (needs Postgres running)
+uv run ruff check .   # lint
+uv run ruff format .  # format
+uv run ty check       # types
 ```
