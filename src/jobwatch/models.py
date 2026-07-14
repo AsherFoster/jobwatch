@@ -23,6 +23,16 @@ class Base(DeclarativeBase):
     }
 
 
+class User(Base):
+    """A person using jobwatch, with their own assessment criteria."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    criteria_text: Mapped[str] = mapped_column(default="")
+
+
 class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (UniqueConstraint("site", "external_id", name="uq_job_site_external_id"),)
@@ -96,24 +106,17 @@ class CompanyDetails(Base):
 
 class UserSearch(Base):
     """A saved job-board search the worker runs every cycle, and the parameters
-    handed to each job source. Single-user for now — gains a user_id if
-    multiple users arrive."""
+    handed to each job source."""
 
     __tablename__ = "user_searches"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # The user who owns this search; null for searches predating users.
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     search_term: Mapped[str]
     location: Mapped[str]
 
-
-class Setting(Base):
-    """Key/value store for settings edited at runtime, e.g. the criteria text."""
-
-    __tablename__ = "settings"
-
-    key: Mapped[str] = mapped_column(primary_key=True)
-    value: Mapped[str]
-    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+    user: Mapped[User | None] = relationship()
 
 
 class Assessment(Base):

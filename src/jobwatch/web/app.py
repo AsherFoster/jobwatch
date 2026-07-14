@@ -14,10 +14,17 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, selectinload
 
-from jobwatch.criteria import get_criteria_text, set_criteria_text
 from jobwatch.db import get_session
 from jobwatch.llm import make_llm_client
-from jobwatch.models import MATCHED_MIN_SCORE, Assessment, Job, UserJobState, UserSearch, utcnow
+from jobwatch.models import (
+    MATCHED_MIN_SCORE,
+    Assessment,
+    Job,
+    User,
+    UserJobState,
+    UserSearch,
+    utcnow,
+)
 from jobwatch.pipeline import assess_single
 from jobwatch.user_state import set_job_applied, set_job_bookmarked, set_job_rating
 
@@ -37,11 +44,62 @@ def get_job(job_id: int, session: SessionDep) -> Job:
 JobDep = Annotated[Job, Depends(get_job)]
 
 
+class NoUserSelected(Exception):
+    """No valid user_id cookie; the visitor must pick or create a user first."""
+
+
+def get_current_user(request: Request, session: SessionDep) -> User:
+    """The user selected via the user_id cookie. Every page except /users
+    requires one; without it the NoUserSelected handler redirects there."""
+    selected = request.cookies.get("user_id", "")
+    if selected.isdigit() and (user := session.get(User, int(selected))):
+        return user
+    raise NoUserSelected
+
+
+UserDep = Annotated[User, Depends(get_current_user)]
+
+
+def nav_context(session: Session, user: User) -> dict:
+    """Template context for the nav user dropdown."""
+    return {"user": user, "users": session.scalars(select(User).order_by(User.id)).all()}
+
+
 app = FastAPI(title="jobwatch")
 
 
+@app.exception_handler(NoUserSelected)
+def redirect_to_user_picker(request: Request, exc: NoUserSelected):
+    return RedirectResponse("/users", status_code=303)
+
+
+@app.get("/users", response_class=HTMLResponse)
+def pick_user(request: Request, session: SessionDep):
+    users = session.scalars(select(User).order_by(User.id)).all()
+    return templates.TemplateResponse(request, "users.html", {"users": users})
+
+
+@app.post("/users")
+def create_user(session: SessionDep, name: Annotated[str, Form(min_length=1)]):
+    user = User(name=name)
+    session.add(user)
+    session.commit()
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie("user_id", str(user.id))
+    return response
+
+
+@app.post("/user")
+def select_user(request: Request, user_id: Annotated[int, Form()]):
+    referer = request.headers.get("referer", "")
+    target = "/" if referer.endswith("/users") else referer or "/"
+    response = RedirectResponse(target, status_code=303)
+    response.set_cookie("user_id", str(user_id))
+    return response
+
+
 @app.get("/", response_class=HTMLResponse)
-def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
+def list_jobs(request: Request, session: SessionDep, user: UserDep, show: str = "matched"):
     query = (
         select(Job)
         .options(
@@ -69,13 +127,15 @@ def list_jobs(request: Request, session: SessionDep, show: str = "matched"):
     return templates.TemplateResponse(
         request,
         "jobs.html",
-        {"jobs": jobs, "show": show},
+        {"jobs": jobs, "show": show, **nav_context(session, user)},
     )
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-def job_detail(request: Request, job: JobDep):
-    return templates.TemplateResponse(request, "job.html", {"job": job})
+def job_detail(request: Request, job: JobDep, session: SessionDep, user: UserDep):
+    return templates.TemplateResponse(
+        request, "job.html", {"job": job, **nav_context(session, user)}
+    )
 
 
 @app.put("/jobs/{job_id}/rating")
@@ -109,7 +169,7 @@ def mark_applied(request: Request, job: JobDep, session: SessionDep):
 
 
 @app.post("/jobs/{job_id}/reassess")
-async def reassess(job: JobDep, session: SessionDep):
+async def reassess(job: JobDep, session: SessionDep, user: UserDep):
     if assessment := job.active_assessment:
         assessment.invalidated_at = utcnow()
         session.expire(job, ["active_assessment"])
@@ -119,7 +179,7 @@ async def reassess(job: JobDep, session: SessionDep):
         session,
         llm,
         job,
-        criteria_text=get_criteria_text(session),
+        criteria_text=user.criteria_text,
     )
 
     session.commit()
@@ -127,15 +187,16 @@ async def reassess(job: JobDep, session: SessionDep):
 
 
 @app.get("/settings", response_class=HTMLResponse)
-def settings(request: Request, session: SessionDep, saved: str = ""):
+def settings(request: Request, session: SessionDep, user: UserDep, saved: str = ""):
     return templates.TemplateResponse(
         request,
         "settings.html",
         {
-            "criteria_text": get_criteria_text(session),
+            "criteria_text": user.criteria_text,
             "searches": session.scalars(select(UserSearch).order_by(UserSearch.id)).all(),
             "saved": saved,
             "show": "settings",
+            **nav_context(session, user),
         },
     )
 
@@ -146,8 +207,9 @@ def criteria_redirect():
 
 
 @app.post("/settings/criteria")
-def save_criteria(session: SessionDep, text: str = Form("")):
-    set_criteria_text(session, text)
+def save_criteria(session: SessionDep, user: UserDep, text: str = Form("")):
+    user.criteria_text = text
+    session.commit()
     return RedirectResponse("/settings?saved=criteria", status_code=303)
 
 
@@ -172,7 +234,8 @@ UserSearchDep = Annotated[UserSearch, Depends(get_user_search)]
 
 
 @app.post("/settings/searches")
-def add_search(session: SessionDep, search: SearchFormDep):
+def add_search(session: SessionDep, search: SearchFormDep, user: UserDep):
+    search.user_id = user.id
     session.add(search)
     session.commit()
     return RedirectResponse("/settings?saved=searches", status_code=303)

@@ -9,8 +9,7 @@ from sqlalchemy import select
 
 import jobwatch.pipeline as pipeline_module
 from jobwatch.assess import Verdict
-from jobwatch.criteria import set_criteria_text
-from jobwatch.models import Assessment, CompanyDetails, Job, UserSearch, utcnow
+from jobwatch.models import Assessment, CompanyDetails, Job, User, UserSearch, utcnow
 from jobwatch.notify import NullNotifier
 from jobwatch.pipeline import assess_single, hours_to_search, run_pipeline
 from jobwatch.search_jobs import JobSource, ScrapedJob
@@ -59,8 +58,17 @@ async def fake_description(company: str) -> str:
     return f"{company} makes widgets."
 
 
+def set_criteria(session, criteria: str) -> None:
+    user = session.scalars(select(User)).first()
+    if user is None:
+        user = User(name="Test")
+        session.add(user)
+    user.criteria_text = criteria
+    session.commit()
+
+
 def run(session, llm, jobs, monkeypatch, criteria="Positives: python", describe=fake_description):
-    set_criteria_text(session, criteria)
+    set_criteria(session, criteria)
     add_search(session)
     monkeypatch.setattr(
         pipeline_module, "JOB_SOURCES", [fake_source(lambda search, hours_old: jobs)]
