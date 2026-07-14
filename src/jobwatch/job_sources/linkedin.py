@@ -11,9 +11,9 @@ from typing import Any
 import structlog
 
 from jobwatch.models import UserSearch
-from jobwatch.search_jobs import JobSource, ScrapedJob
+from jobwatch.pipeline.sync_jobs import JobSource, ScrapedJob
 
-log = structlog.getLogger(__name__)
+log = structlog.get_logger()
 
 
 def _text(record: dict[str, Any], key: str) -> str:

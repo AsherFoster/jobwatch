@@ -4,7 +4,7 @@ import httpx2
 import pytest
 
 from jobwatch.models import Job
-from jobwatch.notify import DiscordNotifier
+from jobwatch.pipeline.notify import DiscordNotifier
 
 
 def make_jobs(n: int) -> list[Job]:

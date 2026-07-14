@@ -6,11 +6,13 @@ from typing import Protocol
 
 import httpx2
 import structlog
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from jobwatch.config import config
-from jobwatch.models import Job
+from jobwatch.models import MATCHED_MIN_SCORE, Assessment, Job, utcnow
 
-log = structlog.getLogger(__name__)
+log = structlog.get_logger()
 
 
 class Notifier(Protocol):
@@ -49,3 +51,28 @@ def make_notifier() -> Notifier:
     if config.notify.discord is not None:
         return DiscordNotifier(config.notify.discord.webhook_url)
     return NullNotifier()
+
+
+def notify_new_matches(session: Session) -> list[Job]:
+    """Send a single notification for matched jobs that were never announced."""
+    notifier = make_notifier()
+
+    matches = session.scalars(
+        select(Job)
+        .join(Assessment, Job.active_assessment)
+        .where(
+            Assessment.score >= MATCHED_MIN_SCORE,
+            Job.notified_at.is_(None),
+        )
+        .order_by(Job.scraped_at)
+    ).all()
+
+    if not matches:
+        return []
+
+    notifier.send_matches(list(matches), review_url=config.web.base_url)
+    now = utcnow()
+    for job in matches:
+        job.notified_at = now
+    session.commit()
+    return list(matches)

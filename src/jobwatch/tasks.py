@@ -17,9 +17,9 @@ from sqlalchemy.engine import make_url
 
 from jobwatch.config import config
 from jobwatch.db import session_maker
-from jobwatch.pipeline import sync_jobs
+from jobwatch.pipeline.sync_jobs import sync_jobs
 
-log = structlog.getLogger(__name__)
+log = structlog.get_logger()
 
 SYNC_JOBS_CRON = "0 * * * *"
 

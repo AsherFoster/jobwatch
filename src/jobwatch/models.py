@@ -38,10 +38,13 @@ class Job(Base):
     __table_args__ = (UniqueConstraint("site", "external_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
+
+    search_id: Mapped[int] = mapped_column(ForeignKey("user_searches.id"))
+    search: Mapped[UserSearch] = relationship()
+    """The search that found this job"""
+
     site: Mapped[str]
     external_id: Mapped[str]
-    search_id: Mapped[int | None] = mapped_column(ForeignKey("user_searches.id"))
-    """The search that found this job; null once that search is deleted."""
     title: Mapped[str]
     company: Mapped[str]
     location: Mapped[str]
@@ -68,7 +71,6 @@ class Job(Base):
     hasn't been reevaluated since they last changed)."""
     user_state: Mapped[UserJobState | None] = relationship(back_populates="job")
     """The user's rating/bookmark/applied state, if they've touched this job."""
-    search: Mapped[UserSearch | None] = relationship()
 
     def latest_assessment(self) -> Assessment | None:
         return self.all_assessments[-1] if self.all_assessments else None
@@ -115,12 +117,11 @@ class UserSearch(Base):
     __tablename__ = "user_searches"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
-    """The user who owns this search; null for searches predating users."""
     search_term: Mapped[str]
     location: Mapped[str]
 
-    user: Mapped[User | None] = relationship()
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user: Mapped[User] = relationship()
 
 
 class Assessment(Base):

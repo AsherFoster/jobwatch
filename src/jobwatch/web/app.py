@@ -26,7 +26,7 @@ from jobwatch.models import (
     UserSearch,
     utcnow,
 )
-from jobwatch.pipeline import assess_single
+from jobwatch.pipeline.assess import assess_single
 from jobwatch.user_state import set_job_applied, set_job_bookmarked, set_job_rating
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")

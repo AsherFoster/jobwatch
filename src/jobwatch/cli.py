@@ -9,8 +9,6 @@ import asyncio
 import click
 import structlog
 
-from jobwatch.criteria import get_criteria_text
-
 log = structlog.get_logger()
 
 
@@ -31,7 +29,7 @@ def worker() -> None:
 def sync_jobs_command() -> None:
     """Pull new jobs from LinkedIn for every configured search (no assessment)."""
     from jobwatch.db import session_maker
-    from jobwatch.pipeline import sync_jobs
+    from jobwatch.pipeline.sync_jobs import sync_jobs
 
     with session_maker() as session:
         asyncio.run(sync_jobs(session))
@@ -51,17 +49,18 @@ def assess_jobs(job_id: int | None) -> None:
     from jobwatch.db import session_maker
     from jobwatch.llm import make_llm_client
     from jobwatch.models import Job
-    from jobwatch.pipeline import assess_pending, assess_single
+    from jobwatch.pipeline.assess import assess_pending, assess_single
 
     llm = make_llm_client()
     with session_maker() as session:
         if job_id is not None:
-            criteria_text = get_criteria_text(session)
-            assert criteria_text is not None
-
             job = session.get(Job, job_id)
             if job is None:
                 raise click.ClickException(f"No job with id {job_id}")
+
+            criteria_text = job.search.user.criteria_text
+            assert criteria_text is not None
+
             verdict = asyncio.run(assess_single(session, llm, job, criteria_text))
             click.echo(f"Job {job_id} scored {verdict.score}/5\n\n{verdict.reasoning}")
         else:
@@ -74,7 +73,7 @@ def test_notify() -> None:
     """Send a test notification to verify the webhook works."""
     from jobwatch.config import config
     from jobwatch.models import Job
-    from jobwatch.notify import make_notifier
+    from jobwatch.pipeline.notify import make_notifier
 
     fake = Job(
         title="Test notification",
