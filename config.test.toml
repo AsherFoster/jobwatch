@@ -1,4 +1,4 @@
-database_url = "sqlite:///data/jobwatch-test.db" # ignored
+database_url = "postgresql+psycopg://jobwatch:jobwatch@localhost:5432/jobwatch_test"
 
 [llm]
 provider = "ollama"    # options: anthropic, gemini, ollama, apple_fm

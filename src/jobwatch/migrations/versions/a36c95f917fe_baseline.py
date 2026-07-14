@@ -68,7 +68,7 @@ def upgrade() -> None:
         "assessments",
         ["job_id"],
         unique=True,
-        sqlite_where=sa.text("invalidated_at IS NULL"),
+        postgresql_where=sa.text("invalidated_at IS NULL"),
     )
     op.create_table(
         "user_job_state",
@@ -94,7 +94,7 @@ def downgrade() -> None:
     op.drop_index(
         "uq_assessment_job_active",
         table_name="assessments",
-        sqlite_where=sa.text("invalidated_at IS NULL"),
+        postgresql_where=sa.text("invalidated_at IS NULL"),
     )
     op.drop_table("assessments")
     op.drop_table("settings")

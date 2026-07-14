@@ -143,6 +143,6 @@ class Assessment(Base):
             "uq_assessment_job_active",
             "job_id",
             unique=True,
-            sqlite_where=text("invalidated_at IS NULL"),
+            postgresql_where=text("invalidated_at IS NULL"),
         ),
     )

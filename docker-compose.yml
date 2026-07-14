@@ -1,21 +1,19 @@
 services:
-  web:
-    build: .
-    restart: unless-stopped
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: jobwatch
+      POSTGRES_PASSWORD: jobwatch
+      POSTGRES_DB: jobwatch
     ports:
-      - "8000:8000"
+      - "5432:5432"
     volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./data:/app/data
+      - jobwatch_db:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U jobwatch" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  worker:
-    build: .
-    command: ["uv", "run", "--no-sync", "jobwatch", "worker"]
-    restart: unless-stopped
-    volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./data:/app/data
-    extra_hosts:
-      # Lets the container reach Ollama on the Mac host; a no-op on Docker Desktop
-      # (where host.docker.internal already resolves) but needed elsewhere.
-      - "host.docker.internal:host-gateway"
+volumes:
+  jobwatch_db:

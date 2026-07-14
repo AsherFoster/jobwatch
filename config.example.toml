@@ -1,6 +1,6 @@
 # Copy to config.toml and edit. Contains secrets, do not commit
 
-database_url = "sqlite:///data/jobwatch.db"
+database_url = "postgresql+psycopg://jobwatch:jobwatch@localhost:5432/jobwatch"
 
 [llm]
 provider = "ollama"    # options: anthropic, gemini, ollama, apple_fm
