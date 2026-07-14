@@ -23,6 +23,16 @@ class Base(DeclarativeBase):
     }
 
 
+class User(Base):
+    """A person using jobwatch, with their own assessment criteria."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    criteria_text: Mapped[str] = mapped_column(default="")
+
+
 class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (UniqueConstraint("site", "external_id", name="uq_job_site_external_id"),)
