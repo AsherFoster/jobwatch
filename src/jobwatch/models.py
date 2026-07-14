@@ -80,6 +80,20 @@ class UserJobState(Base):
     job: Mapped[Job] = relationship(back_populates="user_state")
 
 
+class CompanyDetails(Base):
+    """One row per company name, generated when the first job for that
+    company is stored."""
+
+    __tablename__ = "company_details"
+    __table_args__ = (UniqueConstraint("name", name="uq_company_details_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    logo: Mapped[str | None]  # URL, when the job source provides one
+    description: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
 class UserSearch(Base):
     """A saved job-board search the worker runs every cycle, and the parameters
     handed to each job source. Single-user for now — gains a user_id if
