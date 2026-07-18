@@ -17,7 +17,12 @@ DEFAULT_HOURS_OLD = 24
 
 
 async def store_new_jobs(session: Session, search: UserSearch, scraped: list[ScrapedJob]) -> int:
-    """Insert jobs we haven't seen before; returns how many were new."""
+    """Insert jobs we haven't seen before, queueing an AssessJob task for each;
+    returns how many were new."""
+    from awa.bridge import insert_job_sync
+
+    from jobwatch.tasks import AssessJob
+
     new = 0
     for item in scraped:
         exists = session.scalar(
@@ -26,20 +31,21 @@ async def store_new_jobs(session: Session, search: UserSearch, scraped: list[Scr
         if exists:
             continue
         await ensure_company_details(session, item)
-        session.add(
-            Job(
-                site=item.site,
-                external_id=item.external_id,
-                search=search,
-                title=item.title,
-                company=item.company,
-                location=item.location,
-                url=item.url,
-                description=item.description,
-                posted_at=item.posted_at,
-                raw=item.raw,
-            )
+        job = Job(
+            site=item.site,
+            external_id=item.external_id,
+            search=search,
+            title=item.title,
+            company=item.company,
+            location=item.location,
+            url=item.url,
+            description=item.description,
+            posted_at=item.posted_at,
+            raw=item.raw,
         )
+        session.add(job)
+        session.flush()
+        insert_job_sync(session, AssessJob(job_id=job.id))
         new += 1
     return new
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from jobwatch.job_sources.base import JobSource
@@ -14,6 +14,11 @@ from jobwatch.test_scene import Scene, scene
 
 def stored_external_ids(session: Session) -> list[str]:
     return sorted(session.scalars(select(Job.external_id)).all())
+
+
+def queued_assess_job_ids(session: Session) -> list[int]:
+    rows = session.execute(text("SELECT args FROM awa.jobs WHERE kind = 'assess_job'")).all()
+    return sorted(row.args["job_id"] for row in rows)
 
 
 @pytest.mark.asyncio
@@ -34,6 +39,18 @@ async def test_store_new_jobs_persists_the_scrape(session, scene: Scene):
     assert job.description == item.description
     assert job.raw == item.raw
     assert job.scraped_at is not None
+
+
+@pytest.mark.asyncio
+async def test_store_new_jobs_queues_an_assess_task_per_new_job(session, scene: Scene):
+    scene.company_details()
+    search = scene.user_search()
+    scraped = [scene.scraped_job(external_id="1"), scene.scraped_job(external_id="2")]
+
+    await store_new_jobs(session, search, scraped)
+
+    job_ids = sorted(session.scalars(select(Job.id)).all())
+    assert queued_assess_job_ids(session) == job_ids
 
 
 @pytest.mark.asyncio
