@@ -13,8 +13,11 @@ from sqlalchemy.orm import Session
 os.environ["ENVIRONMENT"] = "test"
 
 # ruff: noqa: E402
+import awa
+
 from jobwatch.config import config
 from jobwatch.models import Base
+from jobwatch.tasks import awa_database_url
 
 
 def _create_test_database_if_missing(database_url: str) -> None:
@@ -46,6 +49,9 @@ def engine_fixture():
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
 
         Base.metadata.create_all(conn)
+
+    with awa.Client(awa_database_url()) as awa_client:
+        awa_client.migrate()
 
     yield engine
 

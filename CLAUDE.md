@@ -12,3 +12,4 @@ Web UI uses bootstrap for styling
 - Prefer obvious, uncomplicated code over excessive comments. If a comment is added, it should be direct and to the point.
 - Use declarative style for unit test utils where possible, and keep arguments minimal: `user()` instead of `create_user(name="")`
 - Committing in unit tests is a no-op and generally not required
+- Don't use session.flush() unless required. Relationships can be set directly: job=job, rather than flushing and using job_id=job.id.

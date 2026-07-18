@@ -13,10 +13,13 @@ of searches.
 
 - [x] Fix alembic foreign key hack, maybe postgres time?
 - [x] Add company context from Google search
+- [x] Multi-user support
+- [x] Reliable company identifiers
+- [x] Show pros/cons/job summary
+- [ ] Surface company summaries
 - [ ] LLM-generated search queries
 - [ ] Refine LLM analysis
 - [ ] Multiple job indexers
-- [ ] Multi-user support
 
 ## Getting started
 
