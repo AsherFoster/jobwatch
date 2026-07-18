@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-import awa
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from jobwatch.job_sources.base import JobSource
 from jobwatch.models import Job, UserSearch, utcnow
 from jobwatch.pipeline.sync_jobs import hours_to_search, store_new_jobs, sync_jobs
 from jobwatch.task_kinds import AssessJob
-from jobwatch.test_scene import Scene, scene
+from jobwatch.test_scene import Scene, queued_task_args, scene
 
 
 def stored_external_ids(session: Session) -> list[str]:
@@ -19,17 +18,11 @@ def stored_external_ids(session: Session) -> list[str]:
 
 
 def queued_assess_job_ids(session: Session) -> list[int]:
-    # No SQLAlchemy model or ORM-friendly query for awa.jobs — even awa's own
-    # awa.testing module reads this table with raw SQL for the same reason:
-    # a separate awa.Client connection wouldn't see this test's uncommitted rows.
-    kind = awa.derive_kind(AssessJob.__name__)
-    rows = session.execute(text("SELECT args FROM awa.jobs WHERE kind = :kind"), {"kind": kind})
-    return sorted(row.args["job_id"] for row in rows)
+    return sorted(args["job_id"] for args in queued_task_args(session, AssessJob))
 
 
 @pytest.mark.asyncio
 async def test_store_new_jobs_persists_the_scrape(session, scene: Scene):
-    scene.company_details()  # keeps ensure_company_details away from Gemini
     search = scene.user_search()
     item = scene.scraped_job(external_id="abc123")
 
@@ -40,7 +33,7 @@ async def test_store_new_jobs_persists_the_scrape(session, scene: Scene):
     assert job.external_id == item.external_id
     assert job.search_id == search.id
     assert job.title == item.title
-    assert job.company == item.company
+    assert job.company.name == item.company
     assert job.url == item.url
     assert job.description == item.description
     assert job.raw == item.raw
@@ -61,7 +54,6 @@ async def test_store_new_jobs_queues_an_assess_task_per_new_job(session, scene: 
 
 @pytest.mark.asyncio
 async def test_store_new_jobs_skips_jobs_already_seen(session, scene: Scene):
-    scene.company_details()
     search = scene.user_search()
     scraped = [scene.scraped_job(external_id="1"), scene.scraped_job(external_id="2")]
     assert await store_new_jobs(session, search, scraped) == 2
@@ -93,7 +85,6 @@ def test_hours_to_search_covers_the_gap_since_the_last_scrape(session, scene: Sc
 async def test_sync_jobs_stores_from_working_sources_despite_failing_ones(
     session, scene: Scene, monkeypatch
 ):
-    scene.company_details()
     scene.user_search()
 
     def broken(search: UserSearch, hours_old: int):

@@ -60,7 +60,7 @@ Their criteria:
         """
 
         prompt = f"""
-**{job.title}** at **{job.company}**, in **{job.location}**
+**{job.title}** at **{job.company.name}**, in **{job.location}**
 
 --
 

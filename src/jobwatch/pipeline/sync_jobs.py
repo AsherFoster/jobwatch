@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from jobwatch.job_sources import JOB_SOURCES
 from jobwatch.job_sources.base import ScrapedJob
 from jobwatch.models import Job, UserSearch, utcnow
-from jobwatch.pipeline.sync_companies import ensure_company_details
+from jobwatch.pipeline.sync_companies import get_company
 from jobwatch.task_kinds import AssessJob
 
 log = structlog.get_logger()
@@ -28,13 +28,13 @@ async def store_new_jobs(session: Session, search: UserSearch, scraped: list[Scr
         )
         if exists:
             continue
-        await ensure_company_details(session, item)
+        company = get_company(session, item)
         job = Job(
             site=item.site,
             external_id=item.external_id,
             search=search,
             title=item.title,
-            company=item.company,
+            company=company,
             location=item.location,
             url=item.url,
             description=item.description,

@@ -19,6 +19,7 @@ from jobwatch.db import session_maker
 from jobwatch.llm import make_llm_client
 from jobwatch.models import Job
 from jobwatch.pipeline.assess import assess_single
+from jobwatch.pipeline.sync_companies import LoadCompanyDetails, load_company_details
 from jobwatch.pipeline.sync_jobs import sync_jobs
 from jobwatch.task_kinds import AssessJob, SyncJobs
 
@@ -53,6 +54,12 @@ def make_client() -> awa.AsyncClient:
             assert stored.active_assessment is None, f"Job {stored.id} already assessed"
             criteria_text = stored.search.user.criteria_text
             await assess_single(session, llm, stored, criteria_text)
+            session.commit()
+
+    @client.task(LoadCompanyDetails)
+    async def handle_load_company_details(job: awa.Job[LoadCompanyDetails]) -> None:
+        with session_maker() as session:
+            await load_company_details(session, job.args.company_id)
             session.commit()
 
     client.periodic("sync_jobs", SYNC_JOBS_CRON, SyncJobs, SyncJobs())

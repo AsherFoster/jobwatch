@@ -13,7 +13,7 @@
     <tr>
         <td>
             <a href="/jobs/{{ job.id }}">{{ job.title }}</a>
-            <div class="text-secondary">{{ job.company }} · {{ job.location }}</div>
+            <div class="text-secondary">{{ job.company.name }} · {{ job.location }}</div>
         </td>
         {% if current %}
         <td>

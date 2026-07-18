@@ -98,7 +98,7 @@ Avoid explaining the obvious. Do not say "requires Rust experience, which you do
 
         clean_description = re.sub(r"\n+", "\n", re.sub(r" +", " ", job.description))
         job_details = f"""
-**{job.title}** at **{job.company}**, in **{job.location}**
+**{job.title}** at **{job.company.name}**, in **{job.location}**
 
 --
 

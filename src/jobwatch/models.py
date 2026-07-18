@@ -46,7 +46,10 @@ class Job(Base):
     site: Mapped[str]
     external_id: Mapped[str]
     title: Mapped[str]
-    company: Mapped[str]
+
+    company_id: Mapped[int] = mapped_column(ForeignKey("company_details.id"))
+    company: Mapped[CompanyDetails] = relationship()
+
     location: Mapped[str]
     url: Mapped[str]
     description: Mapped[str]
@@ -110,8 +113,11 @@ class CompanyDetails(Base):
     reliable identifier we get from scraped jobs."""
     logo: Mapped[str | None]
     """URL, when the job source provides one."""
-    description: Mapped[str]
+    description: Mapped[str] = mapped_column(default="")
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    generated_at: Mapped[datetime | None]
+    """Set once `load_company_details` has filled in the description; null
+    while the row is a blank placeholder waiting for that task to run."""
 
 
 class UserSearch(Base):
