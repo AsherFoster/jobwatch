@@ -1,7 +1,7 @@
 """add_company_id_to_jobs
 
 Revision ID: d7ae67786212
-Revises: 0966d42483b3
+Revises: f75ac168dbd0
 Create Date: 2026-07-18 12:50:10.744728
 
 """
@@ -13,7 +13,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "d7ae67786212"
-down_revision: str | Sequence[str] | None = "0966d42483b3"
+down_revision: str | Sequence[str] | None = "f75ac168dbd0"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
