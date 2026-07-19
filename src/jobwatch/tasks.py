@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import signal
-from dataclasses import dataclass
 
 import awa
 import structlog
@@ -21,22 +20,11 @@ from jobwatch.llm import make_llm_client
 from jobwatch.models import Job
 from jobwatch.pipeline.assess import assess_single
 from jobwatch.pipeline.sync_jobs import sync_jobs
+from jobwatch.task_kinds import AssessJob, SyncJobs
 
 log = structlog.get_logger()
 
 SYNC_JOBS_CRON = "0 * * * *"
-
-
-@dataclass
-class SyncJobs:
-    """Run every configured search against every source and store unseen jobs."""
-
-
-@dataclass
-class AssessJob:
-    """Assess one job against its search owner's current criteria."""
-
-    job_id: int
 
 
 def awa_database_url() -> str:
@@ -61,9 +49,8 @@ def make_client() -> awa.AsyncClient:
     @client.task(AssessJob)
     async def handle_assess_job(job: awa.Job[AssessJob]) -> None:
         with session_maker() as session:
-            stored = session.get(Job, job.args.job_id)
-            if stored is None or stored.active_assessment is not None:
-                return
+            stored = session.get_one(Job, job.args.job_id)
+            assert stored.active_assessment is None, f"Job {stored.id} already assessed"
             criteria_text = stored.search.user.criteria_text
             await assess_single(session, llm, stored, criteria_text)
             session.commit()

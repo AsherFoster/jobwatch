@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import awa
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from jobwatch.job_sources.base import JobSource
 from jobwatch.models import Job, UserSearch, utcnow
 from jobwatch.pipeline.sync_jobs import hours_to_search, store_new_jobs, sync_jobs
+from jobwatch.task_kinds import AssessJob
 from jobwatch.test_scene import Scene, scene
 
 
@@ -17,7 +19,11 @@ def stored_external_ids(session: Session) -> list[str]:
 
 
 def queued_assess_job_ids(session: Session) -> list[int]:
-    rows = session.execute(text("SELECT args FROM awa.jobs WHERE kind = 'assess_job'")).all()
+    # No SQLAlchemy model or ORM-friendly query for awa.jobs — even awa's own
+    # awa.testing module reads this table with raw SQL for the same reason:
+    # a separate awa.Client connection wouldn't see this test's uncommitted rows.
+    kind = awa.derive_kind(AssessJob.__name__)
+    rows = session.execute(text("SELECT args FROM awa.jobs WHERE kind = :kind"), {"kind": kind})
     return sorted(row.args["job_id"] for row in rows)
 
 

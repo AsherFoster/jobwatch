@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 
 import structlog
+from awa.bridge import insert_job_sync
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,7 @@ from jobwatch.job_sources import JOB_SOURCES
 from jobwatch.job_sources.base import ScrapedJob
 from jobwatch.models import Job, UserSearch, utcnow
 from jobwatch.pipeline.sync_companies import ensure_company_details
+from jobwatch.task_kinds import AssessJob
 
 log = structlog.get_logger()
 
@@ -19,10 +21,6 @@ DEFAULT_HOURS_OLD = 24
 async def store_new_jobs(session: Session, search: UserSearch, scraped: list[ScrapedJob]) -> int:
     """Insert jobs we haven't seen before, queueing an AssessJob task for each;
     returns how many were new."""
-    from awa.bridge import insert_job_sync
-
-    from jobwatch.tasks import AssessJob
-
     new = 0
     for item in scraped:
         exists = session.scalar(
@@ -44,7 +42,7 @@ async def store_new_jobs(session: Session, search: UserSearch, scraped: list[Scr
             raw=item.raw,
         )
         session.add(job)
-        session.flush()
+        session.flush()  # AssessJob.job_id is a plain int in awa's JSON payload, not a relationship
         insert_job_sync(session, AssessJob(job_id=job.id))
         new += 1
     return new
