@@ -1,11 +1,10 @@
 import re
-from typing import Annotated
 
 import structlog
 from ollama import AsyncClient
-from pydantic import BaseModel, Field
 
 from jobwatch.llm import Verdict
+from jobwatch.llm.gemini import GeminiVerdict
 from jobwatch.models import Job
 
 log = structlog.get_logger()
@@ -20,12 +19,6 @@ def build_prompt(job: Job, criteria_text: str) -> str:
         f"Location: {job.location}\n\n"
         f"{job.description or '(no description available)'}"
     )
-
-
-class OllamaVerdict(BaseModel):
-    reasoning: str
-
-    score: Annotated[int, Field(strict=True, ge=1, le=5)]
 
 
 class OllamaClient:
@@ -59,12 +52,15 @@ Decide whether the posting is worth their time to review.
                 {"role": "user", "content": user_criteria},
                 {"role": "user", "content": job_details},
             ],
-            format=OllamaVerdict.model_json_schema(),
+            format=GeminiVerdict.model_json_schema(),
         )
 
-        model_verdict = OllamaVerdict.model_validate_json(response.message.content or "")
+        model_verdict = GeminiVerdict.model_validate_json(response.message.content or "")
 
         return Verdict(
             score=model_verdict.score,
             reasoning=model_verdict.reasoning,
+            summary=model_verdict.summary,
+            summary_positives=model_verdict.summary_positives,
+            summary_negatives=model_verdict.summary_negatives,
         )

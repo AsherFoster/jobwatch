@@ -10,6 +10,27 @@ from jobwatch.models import Job
 class FMVerdict:
     reasoning: str = fm.guide("1 - 2 sentences explaining the score")
 
+    summary: str = fm.guide("""
+    1 line objectively summarising the job. Assume title, company, and location are already explained.
+    
+    Bad: Software Engineer at Example Corp in Copenhagen, a company focussed on widgets
+    Good: Backend focussed role in the Operations team, focussed on integrations, with on-call responsibilities.
+    """)
+    summary_positives: str = fm.guide("""
+    1 line summarising summarising why is this role a good fit for the job seeker.
+    Must be very direct, brief, and to the point. Don't pad - only mention notable upsides.
+    
+    Bad: This role would be good for the job seeker because it matches their preferred language of Python
+    Good: Python & TypeScript focussed, relocation support offered, high autonomy.
+    """)
+    summary_negatives: str = fm.guide("""
+    1 line summarising why this job would NOT be a good fit for the job seeker.
+    Must be very direct, brief, and to the point. Don't pad - only mention notable downsides.
+    
+    Bad: The role requires security clearance, which may present a significant hurdle or disqualification.
+    Good: Requires NATO clearance (ineligible) and Rust experience.  
+    """)
+
     score: int = fm.guide(
         """
         1 - 2: not a match, many downsides and no redeeming qualities
@@ -52,4 +73,7 @@ Their criteria:
         return Verdict(
             score=response.score,
             reasoning=response.reasoning,
+            summary=response.summary,
+            summary_positives=response.summary_positives,
+            summary_negatives=response.summary_negatives,
         )
