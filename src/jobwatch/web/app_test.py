@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from jobwatch.llm import Verdict
 from jobwatch.models import Job, User, UserJobState, UserSearch
-from jobwatch.test_scene import Scene, scene
+from jobwatch.test_scene import Scene
 from jobwatch.web.app import app, get_session
 
 
