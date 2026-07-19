@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from jobwatch.models import CompanyDetails
 from jobwatch.pipeline.sync_companies import get_company, load_company_details
 from jobwatch.task_kinds import LoadCompanyDetails
-from jobwatch.test_scene import Scene, queued_tasks, scene
+from jobwatch.test_scene import Scene, queued_tasks
 
 
 @pytest.fixture
