@@ -77,13 +77,13 @@ sdist = { url = "https://files.pythonhosted.org/packages/91/02/5cfad13c6ab9acd22
 
 [[package]]
 name = "awa-pg"
-version = "0.6.2"
+version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/0d/2990b91a9fac3a6be460f2c7f8b1f6a779757198657f1e71f59df02e1f2d/awa_pg-0.6.2-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:f9c82866d69af406e6564875721c6c357bc2b3113d2254e3a17756fd67a3b559", size = 10664148, upload-time = "2026-07-13T07:13:27.426Z" },
-    { url = "https://files.pythonhosted.org/packages/44/94/6f21e093716da0cf6c23b2e0514683fca60bb3d1ff6af1057e2a0b887910/awa_pg-0.6.2-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:3fcaec5ae392708f9ccf917b559e1fd4a6fc7f8f8bb80096532eb30a3ccb939d", size = 10233760, upload-time = "2026-07-13T07:13:29.637Z" },
-    { url = "https://files.pythonhosted.org/packages/b8/62/0fb0e846eecbd1109ecc995ce5777e9a541b147470bfe696c5851e2d2a9a/awa_pg-0.6.2-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:76d35190b3e1a35009940e65c0471f0a883c922f40255207dc9e2e34f8a901ec", size = 11255163, upload-time = "2026-07-13T07:13:31.999Z" },
-    { url = "https://files.pythonhosted.org/packages/d3/56/477ba99a15f170d48e31bf5859efbac05beab5671004517094d27783feed/awa_pg-0.6.2-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:151779687ff20f896af874fd61011ff1f596afc4e4fc83c687fec1f9876cf666", size = 10896868, upload-time = "2026-07-13T07:13:34.419Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/7f/7cc97bff16f0dfe9f401767d115c2d4cd1a3c3d26b13b73b64bdc67e297e/awa_pg-0.6.3-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:c5f445b38bf3bc43956f0917d7623f3d41db91b197f22861a824d56639d64edc", size = 10664992, upload-time = "2026-07-15T04:25:27.535Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/53/1877aac413ab29cdb86ab058652eb161cedc15d14b6e63b9b0d7d47d54b0/awa_pg-0.6.3-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:d071d6bd14d11ce1ce0b10a03eecfafbd6b66750092fe8f5520a1b5bf1e92aae", size = 10233987, upload-time = "2026-07-15T04:25:31.196Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/6c/c1fe86b6d11268adb5dd1fdead3ddb80f17aaae73e7dfaf4999d3054798a/awa_pg-0.6.3-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:407a5f1338082e3f892f8fa1cffffc9329fe36acf4d104baec0cd4101f9696fb", size = 11255775, upload-time = "2026-07-15T04:25:34.255Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/61/ef9f7e5375986bf9512c5f9ba12292313aede8be3ac65cc9d27ec4ed744f/awa_pg-0.6.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7098d0ec6a4506916418bec2298582d98ba8d3a01ef698dee913d04960b24e32", size = 10897704, upload-time = "2026-07-15T04:25:37.614Z" },
 ]
 
 [[package]]
@@ -720,7 +720,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.18.5" },
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.116.0" },
     { name = "apple-fm-sdk", marker = "extra == 'apple-fm'", specifier = ">=0.2.1" },
-    { name = "awa-pg", specifier = ">=0.6.2" },
+    { name = "awa-pg", specifier = ">=0.6.3" },
     { name = "click", specifier = ">=8.1" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.139.0" },
     { name = "google-genai", specifier = ">=2.11.0" },
