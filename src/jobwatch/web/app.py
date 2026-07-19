@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from jobwatch.db import get_session
@@ -196,7 +196,9 @@ def settings(request: Request, session: SessionDep, user: UserDep, saved: str = 
         "settings.html",
         {
             "criteria_text": user.criteria_text,
-            "searches": session.scalars(select(UserSearch).order_by(UserSearch.id)).all(),
+            "searches": session.scalars(
+                select(UserSearch).where(UserSearch.deleted_at.is_(None)).order_by(UserSearch.id)
+            ).all(),
             "saved": saved,
             "show": "settings",
             **nav_context(session, user),
@@ -228,7 +230,7 @@ SearchFormDep = Annotated[UserSearch, Depends(search_form)]
 
 def get_user_search(search_id: int, session: SessionDep) -> UserSearch:
     row = session.get(UserSearch, search_id)
-    if row is None:
+    if row is None or row.deleted_at is not None:
         raise HTTPException(status_code=404)
     return row
 
@@ -254,8 +256,7 @@ def update_search(row: UserSearchDep, session: SessionDep, search: SearchFormDep
 
 @app.post("/settings/searches/{search_id}/delete")
 def delete_search(row: UserSearchDep, session: SessionDep):
-    # Jobs found by this search outlive it, just without attribution.
-    session.execute(update(Job).where(Job.search_id == row.id).values(search_id=None))
-    session.delete(row)
+    # Soft-deleted, not removed: jobs it already found keep a valid search_id.
+    row.deleted_at = utcnow()
     session.commit()
     return RedirectResponse("/settings?saved=searches", status_code=303)

@@ -14,7 +14,7 @@ from jobwatch.typing import unwrap
 def _state(job: Job) -> UserJobState:
     """The job's user-state row, created on first touch."""
     if job.user_state is None:
-        job.user_state = UserJobState(job_id=job.id)
+        job.user_state = UserJobState()
     return unwrap(job.user_state)
 
 

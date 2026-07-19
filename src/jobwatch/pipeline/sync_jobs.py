@@ -30,7 +30,7 @@ async def store_new_jobs(session: Session, search: UserSearch, scraped: list[Scr
             Job(
                 site=item.site,
                 external_id=item.external_id,
-                search_id=search.id,
+                search=search,
                 title=item.title,
                 company=item.company,
                 location=item.location,
@@ -58,7 +58,9 @@ def hours_to_search(session: Session, search: UserSearch) -> int:
 async def sync_jobs(session: Session) -> None:
     """Run every configured search against every source and store unseen jobs;
     returns how many were new."""
-    searches = session.scalars(select(UserSearch).order_by(UserSearch.id)).all()
+    searches = session.scalars(
+        select(UserSearch).where(UserSearch.deleted_at.is_(None)).order_by(UserSearch.id)
+    ).all()
     if not searches:
         log.warning("No searches configured; nothing to scrape. Add them at /settings.")
     for search in searches:

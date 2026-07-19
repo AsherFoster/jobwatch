@@ -26,6 +26,7 @@ class Scene:
     def user(self, *, criteria_text: str = "Positives: python. Negatives: consultancies.") -> User:
         user = User(name=f"User {next(self._ids)}", criteria_text=criteria_text)
         self.session.add(user)
+        self.session.flush()
         return user
 
     def user_search(
@@ -37,6 +38,7 @@ class Scene:
     ) -> UserSearch:
         search = UserSearch(search_term=search_term, location=location, user=user or self.user())
         self.session.add(search)
+        self.session.flush()
         return search
 
     def job(
@@ -59,6 +61,7 @@ class Scene:
             raw="{}",
         )
         self.session.add(job)
+        self.session.flush()
         return job
 
     def assessment(
@@ -77,11 +80,13 @@ class Scene:
         self.session.add(assessment)
         if notified:
             job.notified_at = utcnow()
+        self.session.flush()
         return assessment
 
     def company_details(self, *, name: str = "Acme", **fields) -> CompanyDetails:
         details = CompanyDetails(name=name, description=f"{name} makes widgets", **fields)
         self.session.add(details)
+        self.session.flush()
         return details
 
     def scraped_job(
