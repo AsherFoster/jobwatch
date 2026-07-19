@@ -24,7 +24,6 @@ class Scene:
     def __init__(self, session: Session) -> None:
         self.session = session
         self._ids = itertools.count(1)
-        self._default_company: CompanyDetails | None = None
 
     def user(self, *, criteria_text: str = "Positives: python. Negatives: consultancies.") -> User:
         user = User(name=f"User {next(self._ids)}", criteria_text=criteria_text)
@@ -53,16 +52,12 @@ class Scene:
         company: CompanyDetails | None = None,
     ) -> Job:
         external_id = external_id or str(next(self._ids))
-        if company is None:
-            if self._default_company is None:
-                self._default_company = self.company_details()
-            company = self._default_company
         job = Job(
             site="linkedin",
             external_id=external_id,
             search=search or self.user_search(),
             title=title or f"Job {external_id}",
-            company=company,
+            company=company or self.company_details(),
             location="Copenhagen",
             url=f"https://example.com/{external_id}",
             description="Python things",
@@ -91,9 +86,13 @@ class Scene:
         self.session.flush()
         return assessment
 
-    def company_details(self, *, name: str = "Acme", **fields) -> CompanyDetails:
-        fields.setdefault("description", f"{name} makes widgets")
-        details = CompanyDetails(name=name, **fields)
+    def company_details(
+        self, *, name: str | None = None, description: str | None = None
+    ) -> CompanyDetails:
+        name = name or f"Company {next(self._ids)}"
+        if description is None:
+            description = f"{name} makes widgets"
+        details = CompanyDetails(name=name, description=description)
         self.session.add(details)
         self.session.flush()
         return details
@@ -121,8 +120,8 @@ def scene(session: Session) -> Scene:
     return Scene(session)
 
 
-def queued_task_args(session: Session, kind: type) -> list[dict]:
-    """Args of every queued awa task of the given kind.
+def queued_tasks[T](session: Session, kind: type[T]) -> list[T]:
+    """Every queued awa task of the given kind, as instances of it.
 
     There's no SQLAlchemy model for awa.jobs — it's owned by awa's own
     migration, not ours — so query it with core constructs instead of the
@@ -131,4 +130,4 @@ def queued_task_args(session: Session, kind: type) -> list[dict]:
     """
     jobs = table("jobs", column("kind"), column("args"), schema="awa")
     rows = session.execute(select(jobs.c.args).where(jobs.c.kind == awa.derive_kind(kind.__name__)))
-    return [row.args for row in rows]
+    return [kind(**row.args) for row in rows]

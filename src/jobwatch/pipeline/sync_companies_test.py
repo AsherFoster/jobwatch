@@ -5,8 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from jobwatch.models import CompanyDetails
-from jobwatch.pipeline.sync_companies import LoadCompanyDetails, get_company, load_company_details
-from jobwatch.test_scene import Scene, queued_task_args, scene
+from jobwatch.pipeline.sync_companies import get_company, load_company_details
+from jobwatch.task_kinds import LoadCompanyDetails
+from jobwatch.test_scene import Scene, queued_tasks, scene
 
 
 @pytest.fixture
@@ -28,15 +29,13 @@ def company_details(session: Session) -> CompanyDetails:
 
 
 def queued_company_ids(session: Session) -> list[int]:
-    return sorted(args["company_id"] for args in queued_task_args(session, LoadCompanyDetails))
+    return sorted(task.company_id for task in queued_tasks(session, LoadCompanyDetails))
 
 
-def test_creates_a_blank_row_and_queues_load_company_details(session, scene: Scene):
-    raw = (
-        '{"company_url": "https://dk.linkedin.com/company/acme",'
-        ' "company_logo": "https://logo.test/acme.png"}'
+def test_creates_a_blank_row_and_queues_load_company_details(session):
+    company = get_company(
+        session, name="Acme", linkedin_slug="acme", logo="https://logo.test/acme.png"
     )
-    company = get_company(session, scene.scraped_job(external_id="1", raw=raw))
 
     assert company.name == "Acme"
     assert company.linkedin_slug == "acme"
@@ -47,37 +46,33 @@ def test_creates_a_blank_row_and_queues_load_company_details(session, scene: Sce
     assert queued_company_ids(session) == [company.id]
 
 
-def test_known_company_is_returned_without_queueing(session, scene: Scene):
-    first = get_company(session, scene.scraped_job(external_id="1"))
+def test_known_company_is_returned_without_queueing(session):
+    first = get_company(session, name="Acme")
     session.commit()
-    second = get_company(session, scene.scraped_job(external_id="2"))
+    second = get_company(session, name="Acme")
 
     assert second.id == first.id
     assert queued_company_ids(session) == [first.id]
 
 
-def test_companies_match_by_linkedin_slug_despite_name_differences(session, scene: Scene):
-    raw = '{"company_url": "https://dk.linkedin.com/company/acme"}'
-    first = get_company(session, scene.scraped_job(external_id="1", company="Acme", raw=raw))
+def test_companies_match_by_linkedin_slug_despite_name_differences(session):
+    first = get_company(session, name="Acme", linkedin_slug="acme")
     session.commit()
 
-    # Same slug under a different name and subdomain: no second row.
-    raw = '{"company_url": "https://www.linkedin.com/company/acme"}'
-    second = get_company(session, scene.scraped_job(external_id="2", company="Acme ApS", raw=raw))
+    # Same slug under a different name: no second row.
+    second = get_company(session, name="Acme ApS", linkedin_slug="acme")
 
     assert second.id == first.id
     assert company_details(session).name == "Acme"
     assert queued_company_ids(session) == [first.id]
 
 
-def test_name_match_backfills_missing_linkedin_slug(session, scene: Scene):
-    # raw has no company_url
-    first = get_company(session, scene.scraped_job(external_id="1"))
+def test_name_match_backfills_missing_linkedin_slug(session):
+    first = get_company(session, name="Acme")
     session.commit()
     assert first.linkedin_slug is None
 
-    raw = '{"company_url": "https://dk.linkedin.com/company/acme"}'
-    second = get_company(session, scene.scraped_job(external_id="2", raw=raw))
+    second = get_company(session, name="Acme", linkedin_slug="acme")
 
     assert second.id == first.id
     assert company_details(session).linkedin_slug == "acme"
@@ -87,7 +82,6 @@ def test_name_match_backfills_missing_linkedin_slug(session, scene: Scene):
 @pytest.mark.asyncio
 async def test_load_company_details_generates_description(session, scene: Scene, describe):
     company = scene.company_details(name="Acme", description="")
-    session.flush()
 
     await load_company_details(session, company.id)
 
@@ -101,7 +95,6 @@ async def test_load_company_details_does_not_redo_work_already_done(
     session, scene: Scene, describe
 ):
     company = scene.company_details(name="Acme", description="Acme makes widgets")
-    session.flush()
 
     await load_company_details(session, company.id)
 

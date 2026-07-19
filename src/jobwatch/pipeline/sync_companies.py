@@ -1,25 +1,11 @@
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
-
-import structlog
 from awa.bridge import insert_job_sync
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jobwatch.job_sources.base import ScrapedJob
-from jobwatch.job_sources.linkedin import linkedin_company_slug
 from jobwatch.models import CompanyDetails, utcnow
-
-log = structlog.get_logger()
-
-
-@dataclass
-class LoadCompanyDetails:
-    """Generate the description for a CompanyDetails row created by get_company."""
-
-    company_id: int
+from jobwatch.task_kinds import LoadCompanyDetails
 
 
 async def generate_company_description(company: str) -> str:
@@ -29,34 +15,30 @@ async def generate_company_description(company: str) -> str:
     return await gemini.generate_company_description(company)
 
 
-def get_company(session: Session, item: ScrapedJob) -> CompanyDetails:
-    """Return the CompanyDetails row for this job's company, creating a blank
-    one — and queuing `load_company_details` to fill it in — the first time a
-    company is seen.
+def get_company(
+    session: Session, *, name: str, linkedin_slug: str | None = None, logo: str | None = None
+) -> CompanyDetails:
+    """Return the CompanyDetails row for a company, creating a blank one — and
+    queuing `load_company_details` to fill it in — the first time a company is
+    seen.
 
-    An existing company is matched by its LinkedIn slug when the scrape
-    provides one, falling back to a case-insensitive name match (which also
-    backfills the slug on rows that predate it).
+    An existing company is matched by its LinkedIn slug when one is provided,
+    falling back to a case-insensitive name match (which also backfills the
+    slug on rows that predate it).
     """
-    raw = json.loads(item.raw)
-    slug = linkedin_company_slug(raw.get("company_url"))
     existing = None
-    if slug:
+    if linkedin_slug:
         existing = session.scalar(
-            select(CompanyDetails).where(CompanyDetails.linkedin_slug == slug)
+            select(CompanyDetails).where(CompanyDetails.linkedin_slug == linkedin_slug)
         )
     if existing is None:
-        existing = session.scalar(
-            select(CompanyDetails).where(CompanyDetails.name.ilike(item.company))
-        )
+        existing = session.scalar(select(CompanyDetails).where(CompanyDetails.name.ilike(name)))
         if existing is not None and existing.linkedin_slug is None:
-            existing.linkedin_slug = slug
+            existing.linkedin_slug = linkedin_slug
     if existing is not None:
         return existing
 
-    company = CompanyDetails(
-        name=item.company, linkedin_slug=slug, logo=raw.get("company_logo") or None
-    )
+    company = CompanyDetails(name=name, linkedin_slug=linkedin_slug, logo=logo)
     session.add(company)
     session.flush()
     insert_job_sync(session, LoadCompanyDetails(company_id=company.id))

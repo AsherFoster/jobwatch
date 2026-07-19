@@ -19,9 +19,9 @@ from jobwatch.db import session_maker
 from jobwatch.llm import make_llm_client
 from jobwatch.models import Job
 from jobwatch.pipeline.assess import assess_single
-from jobwatch.pipeline.sync_companies import LoadCompanyDetails, load_company_details
+from jobwatch.pipeline.sync_companies import load_company_details
 from jobwatch.pipeline.sync_jobs import sync_jobs
-from jobwatch.task_kinds import AssessJob, SyncJobs
+from jobwatch.task_kinds import AssessJob, LoadCompanyDetails, SyncJobs
 
 log = structlog.get_logger()
 

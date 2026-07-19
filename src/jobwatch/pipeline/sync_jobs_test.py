@@ -10,7 +10,7 @@ from jobwatch.job_sources.base import JobSource
 from jobwatch.models import Job, UserSearch, utcnow
 from jobwatch.pipeline.sync_jobs import hours_to_search, store_new_jobs, sync_jobs
 from jobwatch.task_kinds import AssessJob
-from jobwatch.test_scene import Scene, queued_task_args, scene
+from jobwatch.test_scene import Scene, queued_tasks, scene
 
 
 def stored_external_ids(session: Session) -> list[str]:
@@ -18,7 +18,7 @@ def stored_external_ids(session: Session) -> list[str]:
 
 
 def queued_assess_job_ids(session: Session) -> list[int]:
-    return sorted(args["job_id"] for args in queued_task_args(session, AssessJob))
+    return sorted(task.job_id for task in queued_tasks(session, AssessJob))
 
 
 @pytest.mark.asyncio
@@ -42,7 +42,6 @@ async def test_store_new_jobs_persists_the_scrape(session, scene: Scene):
 
 @pytest.mark.asyncio
 async def test_store_new_jobs_queues_an_assess_task_per_new_job(session, scene: Scene):
-    scene.company_details()
     search = scene.user_search()
     scraped = [scene.scraped_job(external_id="1"), scene.scraped_job(external_id="2")]
 
