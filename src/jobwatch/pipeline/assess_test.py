@@ -8,7 +8,7 @@ from sqlalchemy import select
 from jobwatch.llm import Verdict
 from jobwatch.models import Assessment, Job, utcnow
 from jobwatch.pipeline.assess import assess_pending, assess_single, get_unassessed_job
-from jobwatch.test_scene import Scene, scene
+from jobwatch.test_scene import Scene
 from jobwatch.typing import unwrap
 
 

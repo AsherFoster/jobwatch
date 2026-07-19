@@ -11,7 +11,7 @@ from jobwatch.job_sources.base import JobSource
 from jobwatch.models import Job, UserSearch, utcnow
 from jobwatch.pipeline.sync_jobs import hours_to_search, store_new_jobs, sync_jobs
 from jobwatch.task_kinds import AssessJob
-from jobwatch.test_scene import Scene, scene
+from jobwatch.test_scene import Scene
 
 
 def stored_external_ids(session: Session) -> list[str]:

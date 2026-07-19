@@ -19,6 +19,11 @@ from jobwatch.config import config
 from jobwatch.models import Base
 from jobwatch.tasks import awa_database_url
 
+# Registers the `scene` fixture as a plugin so test files don't need to import
+# it directly - importing it just to expose it as a fixture triggers ruff's
+# F811 when a test function then redeclares it as a parameter.
+pytest_plugins = ["jobwatch.test_scene"]
+
 
 def _create_test_database_if_missing(database_url: str) -> None:
     url = make_url(database_url)

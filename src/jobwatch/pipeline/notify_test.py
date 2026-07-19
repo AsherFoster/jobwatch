@@ -5,7 +5,7 @@ import pytest
 
 from jobwatch.models import Job
 from jobwatch.pipeline.notify import DiscordNotifier, notify_new_matches
-from jobwatch.test_scene import Scene, scene
+from jobwatch.test_scene import Scene
 
 
 def make_jobs(n: int) -> list[Job]:
