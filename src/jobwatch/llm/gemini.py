@@ -18,20 +18,17 @@ DEFAULT_RETRY_DELAY = 60.0
 
 
 def gemini_retry_delay(error: errors.APIError) -> float:
-    """Seconds Gemini asked us to wait, from the RetryInfo detail on a 429.
+    """Seconds Gemini asked us to wait, from the 429's RetryInfo detail:
+    {"@type": ".../google.rpc.RetryInfo", "retryDelay": "39s"}.
 
-    error.details holds the raw response JSON, which may or may not be
-    wrapped in an outer {"error": ...} object. The RetryInfo detail looks
-    like {"@type": ".../google.rpc.RetryInfo", "retryDelay": "39s"}.
+    retryDelay is a protobuf JSON Duration - always decimal seconds with an
+    "s" suffix. error.details is the response JSON, with or without the
+    outer {"error": ...} wrapper depending on transport.
     """
     details = error.details if isinstance(error.details, dict) else {}
-    if isinstance(details.get("error"), dict):
-        details = details["error"]
-    for detail in details.get("details") or []:
-        if isinstance(detail, dict) and detail.get("@type", "").endswith("RetryInfo"):
-            match = re.fullmatch(r"([\d.]+)s", detail.get("retryDelay", ""))
-            if match:
-                return float(match.group(1))
+    for detail in details.get("error", details).get("details") or []:
+        if detail.get("@type", "").endswith("RetryInfo"):
+            return float(detail["retryDelay"].removesuffix("s"))
     return DEFAULT_RETRY_DELAY
 
 

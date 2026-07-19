@@ -8,6 +8,7 @@ leader-elected scheduler fires the periodic ones.
 from __future__ import annotations
 
 import asyncio
+import random
 import signal
 
 import awa
@@ -22,7 +23,6 @@ from jobwatch.models import Job
 from jobwatch.pipeline.assess import assess_single
 from jobwatch.pipeline.sync_companies import load_company_details
 from jobwatch.pipeline.sync_jobs import sync_jobs
-from jobwatch.rate_limit import RateLimitGate, backoff_delay
 from jobwatch.task_kinds import AssessJob, LoadCompanyDetails, SyncJobs
 
 log = structlog.get_logger()
@@ -39,23 +39,26 @@ def awa_database_url() -> str:
     return url.set(drivername="postgresql").render_as_string(hide_password=False)
 
 
-async def run_assess_job(
-    session: Session, llm: LLMClient, gate: RateLimitGate, job_id: int
-) -> awa.Snooze | None:
-    """Assess one job, snoozing (no attempt consumed) while the LLM is rate
-    limited. A rate-limit response closes the shared gate, so queued jobs
-    back off without even calling the API."""
-    wait = gate.seconds_until_open()
-    if wait > 0:
-        return awa.Snooze(backoff_delay(wait))
+MIN_JITTER = 30.0
 
+
+def backoff_delay(wait: float) -> float:
+    """wait plus jitter - an extra uniform 0..max(MIN_JITTER, wait/2) seconds,
+    so a backlog of rate-limited jobs wakes spread out after the limit resets
+    instead of stampeding it. Proportional so long (e.g. daily-quota) waits
+    spread over a proportionally wider window."""
+    return wait + random.uniform(0, max(MIN_JITTER, wait / 2))
+
+
+async def run_assess_job(session: Session, llm: LLMClient, job_id: int) -> awa.Snooze | None:
+    """Assess one job, snoozing (no attempt consumed) past the provider's
+    stated reset when rate limited."""
     stored = session.get_one(Job, job_id)
     assert stored.active_assessment is None, f"Job {stored.id} already assessed"
     criteria_text = stored.search.user.criteria_text
     try:
         await assess_single(session, llm, stored, criteria_text)
     except RateLimited as e:
-        gate.close_for(e.retry_after)
         log.warning(
             "Assessment rate limited; backing off", job_id=job_id, retry_after=e.retry_after
         )
@@ -68,7 +71,6 @@ def make_client() -> awa.AsyncClient:
     """Build the awa client with every task handler and schedule registered."""
     client = awa.AsyncClient(awa_database_url())
     llm = make_llm_client()
-    assess_gate = RateLimitGate()
 
     @client.task(SyncJobs)
     async def handle_sync_jobs(job: awa.Job[SyncJobs]) -> None:
@@ -78,7 +80,7 @@ def make_client() -> awa.AsyncClient:
     @client.task(AssessJob)
     async def handle_assess_job(job: awa.Job[AssessJob]) -> awa.Snooze | None:
         with session_maker() as session:
-            return await run_assess_job(session, llm, assess_gate, job.args.job_id)
+            return await run_assess_job(session, llm, job.args.job_id)
 
     @client.task(LoadCompanyDetails)
     async def handle_load_company_details(job: awa.Job[LoadCompanyDetails]) -> None:
