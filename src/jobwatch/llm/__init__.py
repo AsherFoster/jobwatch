@@ -5,6 +5,17 @@ from jobwatch.config import config
 from jobwatch.models import Job
 
 
+class RateLimited(Exception):
+    """The provider rejected the request due to rate limits.
+
+    retry_after is the provider's stated wait in seconds before retrying.
+    """
+
+    def __init__(self, retry_after: float) -> None:
+        super().__init__(f"rate limited, retry after {retry_after:.0f}s")
+        self.retry_after = retry_after
+
+
 @dataclass
 class Verdict:
     score: int
