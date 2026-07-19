@@ -84,3 +84,34 @@ def test_notify() -> None:
     )
     make_notifier().send_matches([fake], review_url=config.web.base_url)
     click.echo("Notification sent")
+
+
+@app.command("resetdb")
+def resetdb() -> None:
+    """Create the database schema and stamp it at the latest migration."""
+    from pathlib import Path
+
+    import awa
+    from alembic import command
+    from alembic.config import Config
+
+    from jobwatch.db import session_maker
+    from jobwatch.models import Base
+    from jobwatch.tasks import awa_database_url
+
+    with session_maker() as session:
+        conn = session.connection()
+        Base.metadata.drop_all(conn)
+
+        Base.metadata.create_all(conn)
+
+        alembic_cfg = Config(Path(__file__).parent.parent.parent / "alembic.ini")
+        alembic_cfg.attributes["connection"] = conn
+        command.stamp(alembic_cfg, "heads")
+
+        session.commit()
+
+    with awa.Client(awa_database_url()) as awa_client:
+        awa_client.migrate()
+
+    click.echo("Database initialized")
