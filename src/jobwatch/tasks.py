@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import signal
-from dataclasses import dataclass
 
 import awa
 import structlog
@@ -17,16 +16,15 @@ from sqlalchemy.engine import make_url
 
 from jobwatch.config import config
 from jobwatch.db import session_maker
+from jobwatch.llm import make_llm_client
+from jobwatch.models import Job
+from jobwatch.pipeline.assess import assess_single
 from jobwatch.pipeline.sync_jobs import sync_jobs
+from jobwatch.task_kinds import AssessJob, SyncJobs
 
 log = structlog.get_logger()
 
 SYNC_JOBS_CRON = "0 * * * *"
-
-
-@dataclass
-class SyncJobs:
-    """Run every configured search against every source and store unseen jobs."""
 
 
 def awa_database_url() -> str:
@@ -41,11 +39,21 @@ def awa_database_url() -> str:
 def make_client() -> awa.AsyncClient:
     """Build the awa client with every task handler and schedule registered."""
     client = awa.AsyncClient(awa_database_url())
+    llm = make_llm_client()
 
     @client.task(SyncJobs)
     async def handle_sync_jobs(job: awa.Job[SyncJobs]) -> None:
         with session_maker() as session:
             await sync_jobs(session)
+
+    @client.task(AssessJob)
+    async def handle_assess_job(job: awa.Job[AssessJob]) -> None:
+        with session_maker() as session:
+            stored = session.get_one(Job, job.args.job_id)
+            assert stored.active_assessment is None, f"Job {stored.id} already assessed"
+            criteria_text = stored.search.user.criteria_text
+            await assess_single(session, llm, stored, criteria_text)
+            session.commit()
 
     client.periodic("sync_jobs", SYNC_JOBS_CRON, SyncJobs, SyncJobs())
     return client

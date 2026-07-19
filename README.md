@@ -72,14 +72,20 @@ that yet.
 
 ```bash
 uv run fastapi dev                 # web UI (no pipeline); Docker serves it with uvicorn
-uv run jobwatch worker             # awa worker: syncs jobs hourly, forever
-uv run jobwatch sync-jobs          # pull new jobs from LinkedIn (no assessment)
-uv run jobwatch assess-jobs        # assess stored jobs
+uv run jobwatch worker             # awa worker: syncs jobs hourly, assesses new ones, forever
+uv run jobwatch sync-jobs          # pull new jobs from LinkedIn; queues an AssessJob task per new job
+uv run jobwatch assess-jobs        # assess any jobs that still have no verdict (backfill)
 uv run jobwatch assess-jobs 42     # (re)assess a single job by ID
 uv run jobwatch test-notify        # verify the Discord webhook
 ```
 
 ## How re-analysis works
+
+Newly-scraped jobs are assessed automatically: `sync_jobs` queues an `AssessJob`
+awa task for each new job in the same transaction that stores it, and the
+`worker` process picks those up as it runs. `jobwatch assess-jobs` (no
+argument) is only needed to backfill jobs that predate the worker or whose
+task failed.
 
 Saving new criteria on `/settings` only affects jobs assessed from then on — it does **not**
 retroactively re-run the backlog, so it's safe to tweak criteria without
