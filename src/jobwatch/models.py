@@ -46,7 +46,10 @@ class Job(Base):
     site: Mapped[str]
     external_id: Mapped[str]
     title: Mapped[str]
-    company: Mapped[str]
+
+    company_id: Mapped[int] = mapped_column(ForeignKey("company_details.id"))
+    company: Mapped[CompanyDetails] = relationship()
+
     location: Mapped[str]
     url: Mapped[str]
     description: Mapped[str]
@@ -98,20 +101,24 @@ class UserJobState(Base):
 
 
 class CompanyDetails(Base):
-    """One row per company name, generated when the first job for that
-    company is stored."""
+    """A company a job was scraped for. Deduplicated by LinkedIn slug only, so
+    slugless scrapes create duplicates — those can be merged later, which is
+    cheaper than untangling wrongly name-matched companies."""
 
     __tablename__ = "company_details"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str]
     linkedin_slug: Mapped[str | None] = mapped_column(unique=True)
     """Slug from the company's LinkedIn URL (e.g. "too-good-to-go"), the most
     reliable identifier we get from scraped jobs."""
     logo: Mapped[str | None]
     """URL, when the job source provides one."""
-    description: Mapped[str]
+    description: Mapped[str] = mapped_column(default="")
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    generated_at: Mapped[datetime | None]
+    """Set once `load_company_details` has filled in the description; null
+    while the row is a blank placeholder waiting for that task to run."""
 
 
 class UserSearch(Base):

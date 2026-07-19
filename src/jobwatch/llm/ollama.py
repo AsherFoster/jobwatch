@@ -15,7 +15,7 @@ def build_prompt(job: Job, criteria_text: str) -> str:
         f"## My criteria\n{criteria_text}\n\n"
         f"## Job posting\n"
         f"Title: {job.title}\n"
-        f"Company: {job.company}\n"
+        f"Company: {job.company.name}\n"
         f"Location: {job.location}\n\n"
         f"{job.description or '(no description available)'}"
     )
@@ -39,7 +39,7 @@ Decide whether the posting is worth their time to review.
 
         clean_description = re.sub(r"\n+", "\n", re.sub(r" +", " ", job.description))
         job_details = f"""
-**{job.title}** at **{job.company}**, in **{job.location}**
+**{job.title}** at **{job.company.name}**, in **{job.location}**
 
 --
 

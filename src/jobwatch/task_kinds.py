@@ -20,3 +20,10 @@ class AssessJob:
     """Assess one job against its search owner's current criteria."""
 
     job_id: int
+
+
+@dataclass
+class LoadCompanyDetails:
+    """Generate the description for a CompanyDetails row created by get_company."""
+
+    company_id: int

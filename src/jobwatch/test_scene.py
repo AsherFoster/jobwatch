@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import itertools
 
+import awa
 import pytest
+from sqlalchemy import column, select, table
 from sqlalchemy.orm import Session
 
 from jobwatch.job_sources.base import ScrapedJob
@@ -47,6 +49,7 @@ class Scene:
         title: str | None = None,
         search: UserSearch | None = None,
         external_id: str | None = None,
+        company: CompanyDetails | None = None,
     ) -> Job:
         external_id = external_id or str(next(self._ids))
         job = Job(
@@ -54,7 +57,7 @@ class Scene:
             external_id=external_id,
             search=search or self.user_search(),
             title=title or f"Job {external_id}",
-            company="Acme",
+            company=company or self.company_details(),
             location="Copenhagen",
             url=f"https://example.com/{external_id}",
             description="Python things",
@@ -83,8 +86,13 @@ class Scene:
         self.session.flush()
         return assessment
 
-    def company_details(self, *, name: str = "Acme", **fields) -> CompanyDetails:
-        details = CompanyDetails(name=name, description=f"{name} makes widgets", **fields)
+    def company_details(
+        self, *, name: str | None = None, description: str | None = None
+    ) -> CompanyDetails:
+        name = name or f"Company {next(self._ids)}"
+        if description is None:
+            description = f"{name} makes widgets"
+        details = CompanyDetails(name=name, description=description)
         self.session.add(details)
         self.session.flush()
         return details
@@ -110,3 +118,16 @@ class Scene:
 @pytest.fixture
 def scene(session: Session) -> Scene:
     return Scene(session)
+
+
+def queued_tasks[T](session: Session, kind: type[T]) -> list[T]:
+    """Every queued awa task of the given kind, as instances of it.
+
+    There's no SQLAlchemy model for awa.jobs — it's owned by awa's own
+    migration, not ours — so query it with core constructs instead of the
+    ORM. Reading through `session` (rather than a separate awa.Client
+    connection) is what lets this see the current test's uncommitted rows.
+    """
+    jobs = table("jobs", column("kind"), column("args"), schema="awa")
+    rows = session.execute(select(jobs.c.args).where(jobs.c.kind == awa.derive_kind(kind.__name__)))
+    return [kind(**row.args) for row in rows]

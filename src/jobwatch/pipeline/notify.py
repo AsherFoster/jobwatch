@@ -30,7 +30,8 @@ class DiscordNotifier:
     def send_matches(self, jobs: list[Job], review_url: str) -> None:
         lines = [f"**{len(jobs)} new job match{'es' if len(jobs) != 1 else ''}**"]
         for job in jobs[: self.MAX_LISTED]:
-            lines.append(f"- [{job.title} — {job.company}](<{job.url}>) ({job.location})")
+            company = job.company.name
+            lines.append(f"- [{job.title} — {company}](<{job.url}>) ({job.location})")
         if len(jobs) > self.MAX_LISTED:
             lines.append(f"…and {len(jobs) - self.MAX_LISTED} more.")
         lines.append(f"Review all: {review_url}")

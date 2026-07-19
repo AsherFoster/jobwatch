@@ -1,16 +1,11 @@
 from __future__ import annotations
 
-import json
-
-import structlog
+from awa.bridge import insert_job_sync
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jobwatch.job_sources.base import ScrapedJob
-from jobwatch.job_sources.linkedin import linkedin_company_slug
-from jobwatch.models import CompanyDetails
-
-log = structlog.get_logger()
+from jobwatch.models import CompanyDetails, utcnow
+from jobwatch.task_kinds import LoadCompanyDetails
 
 
 async def generate_company_description(company: str) -> str:
@@ -20,35 +15,38 @@ async def generate_company_description(company: str) -> str:
     return await gemini.generate_company_description(company)
 
 
-async def ensure_company_details(session: Session, item: ScrapedJob) -> None:
-    """Create a CompanyDetails row for this job's company, unless one exists.
+def get_company(
+    session: Session, *, name: str, linkedin_slug: str | None = None, logo: str | None = None
+) -> CompanyDetails:
+    """Return the CompanyDetails row for a company, creating a blank one — and
+    queuing `load_company_details` to fill it in — when none exists.
 
-    An existing company is matched by its LinkedIn slug when the scrape
-    provides one, falling back to a case-insensitive name match (which also
-    backfills the slug on rows that predate it). A failed generation is
-    logged and skipped — no row is created, so the next job from that
-    company retries."""
-    raw = json.loads(item.raw)
-    slug = linkedin_company_slug(raw.get("company_url"))
-    existing = None
-    if slug:
+    Companies are matched by LinkedIn slug only, never by name: a slugless
+    scrape creates a new row even if the name matches an existing one.
+    Duplicates can be merged later; rows wrongly unified on a shared name
+    would have to be untangled.
+    """
+    if linkedin_slug:
         existing = session.scalar(
-            select(CompanyDetails).where(CompanyDetails.linkedin_slug == slug)
+            select(CompanyDetails).where(CompanyDetails.linkedin_slug == linkedin_slug)
         )
-    if existing is None:
-        existing = session.scalar(
-            select(CompanyDetails).where(CompanyDetails.name.ilike(item.company))
-        )
-        if existing is not None and existing.linkedin_slug is None:
-            existing.linkedin_slug = slug
-    if existing is not None:
-        return
-    try:
-        description = await generate_company_description(item.company)
-    except Exception:
-        log.exception("Description generation failed", company=item.company)
-        return
-    logo = raw.get("company_logo") or None
-    session.add(
-        CompanyDetails(name=item.company, linkedin_slug=slug, logo=logo, description=description)
-    )
+        if existing is not None:
+            return existing
+
+    company = CompanyDetails(name=name, linkedin_slug=linkedin_slug, logo=logo)
+    session.add(company)
+    session.flush()
+    insert_job_sync(session, LoadCompanyDetails(company_id=company.id))
+    return company
+
+
+async def load_company_details(session: Session, company_id: int) -> None:
+    """Generate a company's description, then stamp generated_at. A no-op if
+    the description is already filled in, so a retry after a partial failure
+    doesn't redo work that already succeeded."""
+    company = session.get(CompanyDetails, company_id)
+    assert company is not None
+
+    if not company.description:
+        company.description = await generate_company_description(company.name)
+    company.generated_at = utcnow()

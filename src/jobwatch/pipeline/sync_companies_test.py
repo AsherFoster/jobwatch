@@ -5,8 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from jobwatch.models import CompanyDetails
-from jobwatch.pipeline.sync_companies import ensure_company_details
-from jobwatch.test_scene import Scene
+from jobwatch.pipeline.sync_companies import get_company, load_company_details
+from jobwatch.task_kinds import LoadCompanyDetails
+from jobwatch.test_scene import Scene, queued_tasks, scene
 
 
 @pytest.fixture
@@ -27,83 +28,63 @@ def company_details(session: Session) -> CompanyDetails:
     return session.scalars(select(CompanyDetails)).one()
 
 
-@pytest.mark.asyncio
-async def test_creates_details_for_a_new_company(session, scene: Scene, describe):
-    raw = (
-        '{"company_url": "https://dk.linkedin.com/company/acme",'
-        ' "company_logo": "https://logo.test/acme.png"}'
+def queued_company_ids(session: Session) -> list[int]:
+    return sorted(task.company_id for task in queued_tasks(session, LoadCompanyDetails))
+
+
+def test_creates_a_blank_row_and_queues_load_company_details(session):
+    company = get_company(
+        session, name="Acme", linkedin_slug="acme", logo="https://logo.test/acme.png"
     )
-    await ensure_company_details(session, scene.scraped_job(external_id="1", raw=raw))
+
+    assert company.name == "Acme"
+    assert company.linkedin_slug == "acme"
+    assert company.logo == "https://logo.test/acme.png"
+    assert company.description == ""
+    assert company.generated_at is None
+
+    assert queued_company_ids(session) == [company.id]
+
+
+def test_slug_match_returns_the_existing_row_despite_name_differences(session):
+    first = get_company(session, name="Acme", linkedin_slug="acme")
     session.commit()
 
-    details = company_details(session)
-    assert details.name == "Acme"
-    assert details.linkedin_slug == "acme"
-    assert details.logo == "https://logo.test/acme.png"
-    assert details.description == "Acme makes widgets"
+    # Same slug under a different name: no second row.
+    second = get_company(session, name="Acme ApS", linkedin_slug="acme")
+
+    assert second.id == first.id
+    assert company_details(session).name == "Acme"
+    assert queued_company_ids(session) == [first.id]
+
+
+def test_never_matches_by_name_so_a_slugless_scrape_creates_a_duplicate(session):
+    first = get_company(session, name="Acme")
+    session.commit()
+    second = get_company(session, name="Acme")
+
+    assert second.id != first.id
+    assert queued_company_ids(session) == [first.id, second.id]
 
 
 @pytest.mark.asyncio
-async def test_known_company_is_not_regenerated(session, scene: Scene, describe):
-    await ensure_company_details(session, scene.scraped_job(external_id="1"))
-    session.commit()
-    await ensure_company_details(session, scene.scraped_job(external_id="2"))
+async def test_load_company_details_generates_description(session, scene: Scene, describe):
+    company = scene.company_details(name="Acme", description="")
 
+    await load_company_details(session, company.id)
+
+    assert company.description == "Acme makes widgets"
+    assert company.generated_at is not None
     assert describe == ["Acme"]
 
 
 @pytest.mark.asyncio
-async def test_companies_match_by_linkedin_slug_despite_name_differences(
+async def test_load_company_details_does_not_redo_work_already_done(
     session, scene: Scene, describe
 ):
-    raw = '{"company_url": "https://dk.linkedin.com/company/acme"}'
-    await ensure_company_details(
-        session, scene.scraped_job(external_id="1", company="Acme", raw=raw)
-    )
-    session.commit()
+    company = scene.company_details(name="Acme", description="Acme makes widgets")
 
-    # Same slug under a different name and subdomain: no second row.
-    raw = '{"company_url": "https://www.linkedin.com/company/acme"}'
-    await ensure_company_details(
-        session, scene.scraped_job(external_id="2", company="Acme ApS", raw=raw)
-    )
-    session.commit()
+    await load_company_details(session, company.id)
 
-    assert company_details(session).name == "Acme"
-
-
-@pytest.mark.asyncio
-async def test_name_match_backfills_missing_linkedin_slug(session, scene: Scene, describe):
-    # raw has no company_url
-    await ensure_company_details(session, scene.scraped_job(external_id="1"))
-    session.commit()
-    assert company_details(session).linkedin_slug is None
-
-    raw = '{"company_url": "https://dk.linkedin.com/company/acme"}'
-    await ensure_company_details(session, scene.scraped_job(external_id="2", raw=raw))
-    session.commit()
-
-    assert company_details(session).linkedin_slug == "acme"
-
-
-@pytest.mark.asyncio
-async def test_failed_generation_creates_no_row_so_the_next_job_retries(
-    session, scene: Scene, monkeypatch
-):
-    attempts = 0
-
-    async def flaky(company: str) -> str:
-        nonlocal attempts
-        attempts += 1
-        if attempts == 1:
-            raise RuntimeError("gemini down")
-        return f"{company} makes widgets"
-
-    monkeypatch.setattr("jobwatch.pipeline.sync_companies.generate_company_description", flaky)
-
-    await ensure_company_details(session, scene.scraped_job(external_id="1"))
-    assert session.scalars(select(CompanyDetails)).all() == []
-
-    await ensure_company_details(session, scene.scraped_job(external_id="2"))
-    session.commit()
-    assert company_details(session).description == "Acme makes widgets"
+    assert company.description == "Acme makes widgets"
+    assert describe == []
