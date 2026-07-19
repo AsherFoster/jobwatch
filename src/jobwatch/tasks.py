@@ -50,9 +50,10 @@ def backoff_delay(wait: float) -> float:
     return wait + random.uniform(0, max(MIN_JITTER, wait / 2))
 
 
-async def run_assess_job(session: Session, llm: LLMClient, job_id: int) -> awa.Snooze | None:
+async def run_assess_job(session: Session, job_id: int) -> awa.Snooze | None:
     """Assess one job, snoozing (no attempt consumed) past the provider's
     stated reset when rate limited."""
+    llm = make_llm_client()
     stored = session.get_one(Job, job_id)
     assert stored.active_assessment is None, f"Job {stored.id} already assessed"
     criteria_text = stored.search.user.criteria_text
@@ -70,7 +71,6 @@ async def run_assess_job(session: Session, llm: LLMClient, job_id: int) -> awa.S
 def make_client() -> awa.AsyncClient:
     """Build the awa client with every task handler and schedule registered."""
     client = awa.AsyncClient(awa_database_url())
-    llm = make_llm_client()
 
     @client.task(SyncJobs)
     async def handle_sync_jobs(job: awa.Job[SyncJobs]) -> None:
@@ -80,7 +80,7 @@ def make_client() -> awa.AsyncClient:
     @client.task(AssessJob)
     async def handle_assess_job(job: awa.Job[AssessJob]) -> awa.Snooze | None:
         with session_maker() as session:
-            return await run_assess_job(session, llm, job.args.job_id)
+            return await run_assess_job(session, job.args.job_id)
 
     @client.task(EnrichCompany)
     async def handle_enrich_company(job: awa.Job[EnrichCompany]) -> None:
