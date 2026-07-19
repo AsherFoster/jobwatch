@@ -6,6 +6,8 @@ Never create a PR without instruction from the user.
 
 Web UI uses bootstrap for styling
 
+If the user's changes appear to break something - they're likely intentional. Consider confirming with the user and resolving the breakage rather than reverting.
+
 ## Code style
 
 - Models are defined using SQLAlchemy 2.0 type annotations - don't add `mapped_column` if it's not needed
