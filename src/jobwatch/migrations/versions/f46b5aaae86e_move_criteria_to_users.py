@@ -66,9 +66,7 @@ def downgrade() -> None:
     )
     # ### end Alembic commands ###
     bind = op.get_bind()
-    criteria = bind.execute(
-        sa.select(users.c.criteria_text).order_by(users.c.id).limit(1)
-    ).scalar()
+    criteria = bind.execute(sa.select(users.c.criteria_text).order_by(users.c.id).limit(1)).scalar()
     if criteria:
         bind.execute(
             settings.insert().values(key="criteria_text", value=criteria, updated_at=sa.func.now())

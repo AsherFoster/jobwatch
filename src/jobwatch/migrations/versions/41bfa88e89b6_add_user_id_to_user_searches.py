@@ -27,9 +27,7 @@ user_searches = sa.table("user_searches", sa.column("user_id", sa.Integer))
 def upgrade() -> None:
     """Upgrade schema."""
     op.add_column("user_searches", sa.Column("user_id", sa.Integer(), nullable=True))
-    op.create_foreign_key(
-        "fk_user_searches_user_id", "user_searches", "users", ["user_id"], ["id"]
-    )
+    op.create_foreign_key("fk_user_searches_user_id", "user_searches", "users", ["user_id"], ["id"])
 
     bind = op.get_bind()
     first_user_id = bind.execute(sa.select(users.c.id).order_by(users.c.id).limit(1)).scalar()

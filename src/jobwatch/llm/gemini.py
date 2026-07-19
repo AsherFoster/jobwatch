@@ -4,7 +4,7 @@ from typing import Annotated
 import structlog
 from google import genai
 from google.genai.interactions import Interaction
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from jobwatch.config import config
 from jobwatch.llm import Verdict
@@ -70,7 +70,8 @@ class GeminiVerdict(BaseModel):
 
     reasoning: str
     """
-    2 sentences of reasoning behind how this job is scored. Should be direct and to the point, with no filler.
+    2 sentences of reasoning behind how this job is scored.
+    Should be direct and to the point, with no filler.
     """
 
     score: Annotated[int, Field(strict=True, ge=1, le=5)]
