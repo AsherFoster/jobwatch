@@ -48,7 +48,7 @@ class Job(Base):
     title: Mapped[str]
 
     company_id: Mapped[int] = mapped_column(ForeignKey("company_details.id"))
-    company: Mapped[CompanyDetails] = relationship()
+    company: Mapped[Company] = relationship()
 
     location: Mapped[str]
     url: Mapped[str]
@@ -100,7 +100,7 @@ class UserJobState(Base):
     job: Mapped[Job] = relationship(back_populates="user_state")
 
 
-class CompanyDetails(Base):
+class Company(Base):
     """A company a job was scraped for. Deduplicated by LinkedIn slug only, so
     slugless scrapes create duplicates — those can be merged later, which is
     cheaper than untangling wrongly name-matched companies."""

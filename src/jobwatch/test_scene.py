@@ -17,7 +17,7 @@ from sqlalchemy import column, select, table
 from sqlalchemy.orm import Session
 
 from jobwatch.job_sources.base import ScrapedJob
-from jobwatch.models import Assessment, CompanyDetails, Job, User, UserSearch, utcnow
+from jobwatch.models import Assessment, Company, Job, User, UserSearch, utcnow
 
 
 class Scene:
@@ -49,7 +49,7 @@ class Scene:
         title: str | None = None,
         search: UserSearch | None = None,
         external_id: str | None = None,
-        company: CompanyDetails | None = None,
+        company: Company | None = None,
     ) -> Job:
         external_id = external_id or str(next(self._ids))
         job = Job(
@@ -88,11 +88,11 @@ class Scene:
 
     def company_details(
         self, *, name: str | None = None, description: str | None = None
-    ) -> CompanyDetails:
+    ) -> Company:
         name = name or f"Company {next(self._ids)}"
         if description is None:
             description = f"{name} makes widgets"
-        details = CompanyDetails(name=name, description=description)
+        details = Company(name=name, description=description)
         self.session.add(details)
         self.session.flush()
         return details

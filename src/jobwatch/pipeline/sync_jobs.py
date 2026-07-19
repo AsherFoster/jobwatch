@@ -12,7 +12,7 @@ from jobwatch.job_sources import JOB_SOURCES
 from jobwatch.job_sources.base import ScrapedJob
 from jobwatch.job_sources.linkedin import linkedin_company_slug
 from jobwatch.models import Job, UserSearch, utcnow
-from jobwatch.pipeline.sync_companies import get_company
+from jobwatch.pipeline.sync_companies import get_or_create_company
 from jobwatch.task_kinds import AssessJob
 
 log = structlog.get_logger()
@@ -31,7 +31,7 @@ async def store_new_jobs(session: Session, search: UserSearch, scraped: list[Scr
         if exists:
             continue
         raw = json.loads(item.raw)
-        company = get_company(
+        company = get_or_create_company(
             session,
             name=item.company,
             linkedin_slug=linkedin_company_slug(raw.get("company_url")),

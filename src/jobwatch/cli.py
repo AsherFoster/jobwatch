@@ -72,12 +72,12 @@ def assess_jobs(job_id: int | None) -> None:
 def test_notify() -> None:
     """Send a test notification to verify the webhook works."""
     from jobwatch.config import config
-    from jobwatch.models import CompanyDetails, Job
+    from jobwatch.models import Company, Job
     from jobwatch.pipeline.notify import make_notifier
 
     fake = Job(
         title="Test notification",
-        company=CompanyDetails(name="jobwatch"),
+        company=Company(name="jobwatch"),
         location="Nowhere",
         url="https://example.com",
         external_id="test",

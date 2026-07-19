@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx2
 import pytest
 
-from jobwatch.models import CompanyDetails, Job
+from jobwatch.models import Company, Job
 from jobwatch.pipeline.notify import DiscordNotifier, notify_new_matches
 from jobwatch.test_scene import Scene
 
@@ -14,7 +14,7 @@ def make_jobs(n: int) -> list[Job]:
             site="linkedin",
             external_id=str(i),
             title=f"Job {i}",
-            company=CompanyDetails(name="Acme"),
+            company=Company(name="Acme"),
             location="Copenhagen",
             url=f"https://example.com/{i}",
         )

@@ -23,7 +23,7 @@ class AssessJob:
 
 
 @dataclass
-class LoadCompanyDetails:
+class EnrichCompany:
     """Generate the description for a CompanyDetails row created by get_company."""
 
     company_id: int
