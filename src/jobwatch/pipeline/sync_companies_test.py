@@ -46,16 +46,7 @@ def test_creates_a_blank_row_and_queues_load_company_details(session):
     assert queued_company_ids(session) == [company.id]
 
 
-def test_known_company_is_returned_without_queueing(session):
-    first = get_company(session, name="Acme")
-    session.commit()
-    second = get_company(session, name="Acme")
-
-    assert second.id == first.id
-    assert queued_company_ids(session) == [first.id]
-
-
-def test_companies_match_by_linkedin_slug_despite_name_differences(session):
+def test_slug_match_returns_the_existing_row_despite_name_differences(session):
     first = get_company(session, name="Acme", linkedin_slug="acme")
     session.commit()
 
@@ -67,16 +58,13 @@ def test_companies_match_by_linkedin_slug_despite_name_differences(session):
     assert queued_company_ids(session) == [first.id]
 
 
-def test_name_match_backfills_missing_linkedin_slug(session):
+def test_never_matches_by_name_so_a_slugless_scrape_creates_a_duplicate(session):
     first = get_company(session, name="Acme")
     session.commit()
-    assert first.linkedin_slug is None
+    second = get_company(session, name="Acme")
 
-    second = get_company(session, name="Acme", linkedin_slug="acme")
-
-    assert second.id == first.id
-    assert company_details(session).linkedin_slug == "acme"
-    assert queued_company_ids(session) == [first.id]
+    assert second.id != first.id
+    assert queued_company_ids(session) == [first.id, second.id]
 
 
 @pytest.mark.asyncio

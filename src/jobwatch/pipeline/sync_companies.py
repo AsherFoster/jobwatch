@@ -19,24 +19,19 @@ def get_company(
     session: Session, *, name: str, linkedin_slug: str | None = None, logo: str | None = None
 ) -> CompanyDetails:
     """Return the CompanyDetails row for a company, creating a blank one — and
-    queuing `load_company_details` to fill it in — the first time a company is
-    seen.
+    queuing `load_company_details` to fill it in — when none exists.
 
-    An existing company is matched by its LinkedIn slug when one is provided,
-    falling back to a case-insensitive name match (which also backfills the
-    slug on rows that predate it).
+    Companies are matched by LinkedIn slug only, never by name: a slugless
+    scrape creates a new row even if the name matches an existing one.
+    Duplicates can be merged later; rows wrongly unified on a shared name
+    would have to be untangled.
     """
-    existing = None
     if linkedin_slug:
         existing = session.scalar(
             select(CompanyDetails).where(CompanyDetails.linkedin_slug == linkedin_slug)
         )
-    if existing is None:
-        existing = session.scalar(select(CompanyDetails).where(CompanyDetails.name.ilike(name)))
-        if existing is not None and existing.linkedin_slug is None:
-            existing.linkedin_slug = linkedin_slug
-    if existing is not None:
-        return existing
+        if existing is not None:
+            return existing
 
     company = CompanyDetails(name=name, linkedin_slug=linkedin_slug, logo=logo)
     session.add(company)

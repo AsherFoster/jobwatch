@@ -101,13 +101,14 @@ class UserJobState(Base):
 
 
 class CompanyDetails(Base):
-    """One row per company name, generated when the first job for that
-    company is stored."""
+    """A company a job was scraped for. Deduplicated by LinkedIn slug only, so
+    slugless scrapes create duplicates — those can be merged later, which is
+    cheaper than untangling wrongly name-matched companies."""
 
     __tablename__ = "company_details"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str]
     linkedin_slug: Mapped[str | None] = mapped_column(unique=True)
     """Slug from the company's LinkedIn URL (e.g. "too-good-to-go"), the most
     reliable identifier we get from scraped jobs."""
