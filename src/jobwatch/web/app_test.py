@@ -41,7 +41,6 @@ def client(session: Session, user: User, monkeypatch) -> TestClient:
         yield session
 
     app.dependency_overrides[get_session] = override_get_session
-    session.flush()  # need user.id to set the cookie below
     client = TestClient(app)
     client.cookies.set("user_id", str(user.id))
     return client
@@ -132,7 +131,6 @@ def test_search_form_is_prefilled(client, session: Session, user: User, scene: S
 def test_updating_search_replaces_it(client, session: Session, user: User, scene: Scene):
     scene.user_search(user=user, search_term="a", location="y")
     search_b = scene.user_search(user=user, search_term="b", location="y")
-    session.flush()  # need search_b.id to build the URL below
     client.post(
         f"/settings/searches/{search_b.id}",
         data={"search_term": "platform engineer", "location": "Remote"},
@@ -143,7 +141,6 @@ def test_updating_search_replaces_it(client, session: Session, user: User, scene
 def test_deleting_search_removes_only_that_one(client, session: Session, user: User, scene: Scene):
     search_a = scene.user_search(user=user, search_term="a", location="y")
     scene.user_search(user=user, search_term="b", location="y")
-    session.flush()  # need search_a.id to build the URL below
     response = client.post(f"/settings/searches/{search_a.id}/delete")
     assert response.status_code == 200
     assert _searches(session) == [("b", "y")]
@@ -152,7 +149,6 @@ def test_deleting_search_removes_only_that_one(client, session: Session, user: U
 def test_deleting_search_keeps_its_jobs(client, session: Session, user: User, scene: Scene):
     search = scene.user_search(user=user)
     job = scene.job(search=search)
-    session.flush()  # need search.id to build the URL below
     client.post(f"/settings/searches/{search.id}/delete")
 
     session.refresh(job)
@@ -168,11 +164,8 @@ def test_unknown_search_id_404s(client, session: Session, user: User, scene: Sce
     assert client.post("/settings/searches/999/delete").status_code == 404
 
 
-def test_deleted_search_404s_on_update_or_delete(
-    client, session: Session, user: User, scene: Scene
-):
+def test_deleted_search_404s_on_update_or_delete(client, user: User, scene: Scene):
     search = scene.user_search(user=user)
-    session.flush()  # need search.id to build the URLs below
     client.post(f"/settings/searches/{search.id}/delete")
 
     data = {"search_term": "x", "location": "y"}
@@ -188,7 +181,6 @@ def test_reassess_creates_new_verdict_and_keeps_old_as_history(
     client, session: Session, user: User, scene: Scene
 ):
     job = scene.job()
-    session.flush()  # need job.id to build the URL below
 
     response = client.post(f"/jobs/{job.id}/reassess")
     assert response.status_code == 200  # followed the redirect to the job page
@@ -219,7 +211,6 @@ def _user_states(session: Session) -> list[UserJobState]:
 
 def test_rating_persists_and_updates_in_place(client, session: Session, scene: Scene):
     job = scene.job()
-    session.flush()  # need job.id to build the URL below
 
     response = client.put(f"/jobs/{job.id}/rating", data={"rating": "4"})
     assert response.status_code == 204
@@ -235,7 +226,6 @@ def test_rating_persists_and_updates_in_place(client, session: Session, scene: S
 
 def test_rating_delete_clears(client, session: Session, scene: Scene):
     job = scene.job()
-    session.flush()  # need job.id to build the URL below
     client.put(f"/jobs/{job.id}/rating", data={"rating": "3"})
     client.delete(f"/jobs/{job.id}/rating")
 
@@ -244,7 +234,6 @@ def test_rating_delete_clears(client, session: Session, scene: Scene):
 
 def test_rating_out_of_range_is_rejected(client, session: Session, scene: Scene):
     job = scene.job()
-    session.flush()  # need job.id to build the URL below
     assert client.put(f"/jobs/{job.id}/rating", data={"rating": "6"}).status_code == 422
     assert client.put(f"/jobs/{job.id}/rating", data={"rating": "0"}).status_code == 422
     assert _user_states(session) == []
@@ -255,7 +244,6 @@ def test_rating_out_of_range_is_rejected(client, session: Session, scene: Scene)
 )
 def test_toggle_state_set_and_clear(client, session: Session, scene: Scene, endpoint, attr):
     job = scene.job()
-    session.flush()  # need job.id to build the URL below
 
     assert client.put(f"/jobs/{job.id}/{endpoint}").status_code == 204
     assert getattr(_user_states(session)[0], attr) is not None
@@ -271,7 +259,6 @@ def test_toggle_state_is_idempotent(client, session: Session, scene: Scene, endp
     # A double-clicked button PUTs twice: the state stays set and keeps the
     # first click's timestamp.
     job = scene.job()
-    session.flush()  # need job.id to build the URL below
 
     client.put(f"/jobs/{job.id}/{endpoint}")
     first = getattr(_user_states(session)[0], attr)
@@ -280,18 +267,16 @@ def test_toggle_state_is_idempotent(client, session: Session, scene: Scene, endp
     assert getattr(_user_states(session)[0], attr) == first
 
 
-def test_applied_shown_on_job_page(client, session: Session, scene: Scene):
+def test_applied_shown_on_job_page(client, scene: Scene):
     job = scene.job()
-    session.flush()  # need job.id to build the URL below
     client.put(f"/jobs/{job.id}/applied")
     assert "Applied" in client.get(f"/jobs/{job.id}").text
 
 
-def test_saved_tab_lists_only_bookmarked_jobs(client, session: Session, scene: Scene):
+def test_saved_tab_lists_only_bookmarked_jobs(client, scene: Scene):
     search = scene.user_search()
     bookmarked = scene.job(search=search, title="Backend Engineer")
     scene.job(search=search, title="Frontend Engineer")
-    session.flush()  # need bookmarked.id to build the URL below
     client.put(f"/jobs/{bookmarked.id}/bookmark")
 
     response = client.get("/?show=saved")
