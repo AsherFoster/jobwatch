@@ -123,6 +123,9 @@ class UserSearch(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     search_term: Mapped[str]
     location: Mapped[str]
+    deleted_at: Mapped[datetime | None]
+    """Set when the user removes this search. Kept around (not deleted) so
+    jobs it already found keep a valid search_id."""
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     user: Mapped[User] = relationship()

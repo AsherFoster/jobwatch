@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from jobwatch.llm import Verdict
 from jobwatch.models import Job, User, UserJobState, UserSearch
+from jobwatch.test_scene import Scene, scene
 from jobwatch.web.app import app, get_session
 
 
@@ -18,15 +19,18 @@ class FakeLLM:
     model = "fake"
 
     async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
-        return Verdict(score=5, reasoning="good fit")
+        return Verdict(
+            score=5,
+            reasoning="good fit",
+            summary="good job",
+            summary_positives="it's a job",
+            summary_negatives="it's a job",
+        )
 
 
 @pytest.fixture
-def user(session: Session) -> User:
-    user = User(name="Test")
-    session.add(user)
-    session.commit()
-    return user
+def user(scene: Scene) -> User:
+    return scene.user(criteria_text="")
 
 
 @pytest.fixture
@@ -37,6 +41,7 @@ def client(session: Session, user: User, monkeypatch) -> TestClient:
         yield session
 
     app.dependency_overrides[get_session] = override_get_session
+    session.flush()  # need user.id to set the cookie below
     client = TestClient(app)
     client.cookies.set("user_id", str(user.id))
     return client
@@ -99,17 +104,10 @@ def test_saving_criteria_persists(client):
     assert "Positives: python." not in response.text
 
 
-def _add_search(
-    session: Session, user: User, search_term: str = "x", location: str = "y"
-) -> UserSearch:
-    # TODO remove and replace with scene
-    search = UserSearch(search_term=search_term, location=location, user=user)
-    session.add(search)
-    return search
-
-
 def _searches(session: Session) -> list[tuple[str, str]]:
-    rows = session.scalars(select(UserSearch).order_by(UserSearch.id))
+    rows = session.scalars(
+        select(UserSearch).where(UserSearch.deleted_at.is_(None)).order_by(UserSearch.id)
+    )
     return [(s.search_term, s.location) for s in rows]
 
 
@@ -124,16 +122,17 @@ def test_adding_search_persists(client, session: Session):
     assert _searches(session) == [("software engineer", "Denmark")]
 
 
-def test_search_form_is_prefilled(client, session: Session, user: User):
-    _add_search(session, user, search_term="SRE", location="Denmark")
+def test_search_form_is_prefilled(client, session: Session, user: User, scene: Scene):
+    scene.user_search(user=user, search_term="SRE", location="Denmark")
     response = client.get("/settings")
     assert 'value="SRE"' in response.text
     assert 'value="Denmark"' in response.text
 
 
-def test_updating_search_replaces_it(client, session: Session, user: User):
-    _add_search(session, user, search_term="a")
-    search_b = _add_search(session, user, search_term="b")
+def test_updating_search_replaces_it(client, session: Session, user: User, scene: Scene):
+    scene.user_search(user=user, search_term="a", location="y")
+    search_b = scene.user_search(user=user, search_term="b", location="y")
+    session.flush()  # need search_b.id to build the URL below
     client.post(
         f"/settings/searches/{search_b.id}",
         data={"search_term": "platform engineer", "location": "Remote"},
@@ -141,65 +140,59 @@ def test_updating_search_replaces_it(client, session: Session, user: User):
     assert _searches(session) == [("a", "y"), ("platform engineer", "Remote")]
 
 
-def test_deleting_search_removes_only_that_one(client, session: Session, user: User):
-    search_a = _add_search(session, user, search_term="a")
-    _add_search(session, user, search_term="b")
+def test_deleting_search_removes_only_that_one(client, session: Session, user: User, scene: Scene):
+    search_a = scene.user_search(user=user, search_term="a", location="y")
+    scene.user_search(user=user, search_term="b", location="y")
+    session.flush()  # need search_a.id to build the URL below
     response = client.post(f"/settings/searches/{search_a.id}/delete")
     assert response.status_code == 200
     assert _searches(session) == [("b", "y")]
 
 
-def test_deleting_search_keeps_its_jobs(client, session: Session, user: User):
-    search = _add_search(session, user)
-    job = _add_job(session, search=search)
+def test_deleting_search_keeps_its_jobs(client, session: Session, user: User, scene: Scene):
+    search = scene.user_search(user=user)
+    job = scene.job(search=search)
+    session.flush()  # need search.id to build the URL below
     client.post(f"/settings/searches/{search.id}/delete")
 
     session.refresh(job)
-    assert job is not None
-    assert job.search_id is None
+    session.refresh(search)
+    assert job.search_id == search.id  # the job keeps its attribution
+    assert search.deleted_at is not None  # but the search itself is gone
 
 
-def test_unknown_search_id_404s(client, session: Session, user: User):
-    _add_search(session, user=user)
+def test_unknown_search_id_404s(client, session: Session, user: User, scene: Scene):
+    scene.user_search(user=user)
     data = {"search_term": "x", "location": "y"}
     assert client.post("/settings/searches/999", data=data).status_code == 404
     assert client.post("/settings/searches/999/delete").status_code == 404
+
+
+def test_deleted_search_404s_on_update_or_delete(
+    client, session: Session, user: User, scene: Scene
+):
+    search = scene.user_search(user=user)
+    session.flush()  # need search.id to build the URLs below
+    client.post(f"/settings/searches/{search.id}/delete")
+
+    data = {"search_term": "x", "location": "y"}
+    assert client.post(f"/settings/searches/{search.id}", data=data).status_code == 404
+    assert client.post(f"/settings/searches/{search.id}/delete").status_code == 404
 
 
 def test_job_list_renders(client):
     assert client.get("/?show=all").status_code == 200
 
 
-def _add_job(
-    session: Session,
-    search: UserSearch,
-    external_id: str = "1",
-    title: str = "Backend Engineer",
-) -> Job:
-    # TODO remove and replace with scene
-    job = Job(
-        site="linkedin",
-        external_id=external_id,
-        search=search,
-        title=title,
-        company="Acme",
-        location="Copenhagen",
-        url=f"https://example.com/{external_id}",
-        description="Python things",
-        raw="{}",
-    )
-    session.add(job)
-    return job
-
-
 def test_reassess_creates_new_verdict_and_keeps_old_as_history(
-    client, session: Session, user: User
+    client, session: Session, user: User, scene: Scene
 ):
-    job = _add_job(session, search=_add_search(session, user))
+    job = scene.job()
+    session.flush()  # need job.id to build the URL below
 
     response = client.post(f"/jobs/{job.id}/reassess")
     assert response.status_code == 200  # followed the redirect to the job page
-    assert "current" in response.text
+    assert "Reevaluate" in response.text  # an active assessment is now shown
 
     user.criteria_text = "Completely different criteria"
     session.commit()
@@ -209,7 +202,6 @@ def test_reassess_creates_new_verdict_and_keeps_old_as_history(
 
     session.refresh(job)
 
-    assert job is not None
     assert len(job.assessments) == 2
     active = [a for a in job.assessments if a.invalidated_at is None]
     assert len(active) == 1
@@ -225,12 +217,13 @@ def _user_states(session: Session) -> list[UserJobState]:
     return list(session.scalars(select(UserJobState)))
 
 
-def test_rating_persists_and_updates_in_place(client, session: Session, user: User):
-    job = _add_job(session, search=_add_search(session, user))
+def test_rating_persists_and_updates_in_place(client, session: Session, scene: Scene):
+    job = scene.job()
+    session.flush()  # need job.id to build the URL below
 
     response = client.put(f"/jobs/{job.id}/rating", data={"rating": "4"})
     assert response.status_code == 204
-    assert client.get(f"/jobs/{job.id}").text.count("★") == 4
+    assert client.get(f"/jobs/{job.id}").text.count("⭐") == 4
 
     client.put(f"/jobs/{job.id}/rating", data={"rating": "2"})
 
@@ -240,62 +233,66 @@ def test_rating_persists_and_updates_in_place(client, session: Session, user: Us
     assert states[0].rating == 2
 
 
-def test_rating_delete_clears(client, session: Session, user: User):
-    job = _add_job(session, search=_add_search(session, user))
+def test_rating_delete_clears(client, session: Session, scene: Scene):
+    job = scene.job()
+    session.flush()  # need job.id to build the URL below
     client.put(f"/jobs/{job.id}/rating", data={"rating": "3"})
     client.delete(f"/jobs/{job.id}/rating")
 
     assert _user_states(session)[0].rating is None
 
 
-def test_rating_out_of_range_is_rejected(client, session: Session, user: User):
-    job = _add_job(session, search=_add_search(session, user))
+def test_rating_out_of_range_is_rejected(client, session: Session, scene: Scene):
+    job = scene.job()
+    session.flush()  # need job.id to build the URL below
     assert client.put(f"/jobs/{job.id}/rating", data={"rating": "6"}).status_code == 422
     assert client.put(f"/jobs/{job.id}/rating", data={"rating": "0"}).status_code == 422
     assert _user_states(session) == []
 
 
-def test_bookmark_set_and_clear(client, session: Session, user: User):
-    job = _add_job(session, search=_add_search(session, user))
+@pytest.mark.parametrize(
+    "endpoint,attr", [("bookmark", "bookmarked_at"), ("applied", "applied_at")]
+)
+def test_toggle_state_set_and_clear(client, session: Session, scene: Scene, endpoint, attr):
+    job = scene.job()
+    session.flush()  # need job.id to build the URL below
 
-    assert client.put(f"/jobs/{job.id}/bookmark").status_code == 204
-    assert _user_states(session)[0].bookmarked_at is not None
+    assert client.put(f"/jobs/{job.id}/{endpoint}").status_code == 204
+    assert getattr(_user_states(session)[0], attr) is not None
 
-    assert client.delete(f"/jobs/{job.id}/bookmark").status_code == 204
-    assert _user_states(session)[0].bookmarked_at is None
-
-
-def test_bookmark_is_idempotent(client, session: Session, user: User):
-    # A double-clicked Save button PUTs twice: the job stays bookmarked and
-    # keeps the first click's timestamp.
-    job = _add_job(session, search=_add_search(session, user))
-
-    client.put(f"/jobs/{job.id}/bookmark")
-    first = _user_states(session)[0].bookmarked_at
-
-    client.put(f"/jobs/{job.id}/bookmark")
-    assert _user_states(session)[0].bookmarked_at == first
+    assert client.delete(f"/jobs/{job.id}/{endpoint}").status_code == 204
+    assert getattr(_user_states(session)[0], attr) is None
 
 
-def test_applied_set_and_clear(client, session: Session, user: User):
-    job = _add_job(session, search=_add_search(session, user))
+@pytest.mark.parametrize(
+    "endpoint,attr", [("bookmark", "bookmarked_at"), ("applied", "applied_at")]
+)
+def test_toggle_state_is_idempotent(client, session: Session, scene: Scene, endpoint, attr):
+    # A double-clicked button PUTs twice: the state stays set and keeps the
+    # first click's timestamp.
+    job = scene.job()
+    session.flush()  # need job.id to build the URL below
 
+    client.put(f"/jobs/{job.id}/{endpoint}")
+    first = getattr(_user_states(session)[0], attr)
+
+    client.put(f"/jobs/{job.id}/{endpoint}")
+    assert getattr(_user_states(session)[0], attr) == first
+
+
+def test_applied_shown_on_job_page(client, session: Session, scene: Scene):
+    job = scene.job()
+    session.flush()  # need job.id to build the URL below
     client.put(f"/jobs/{job.id}/applied")
-    assert _user_states(session)[0].applied_at is not None
     assert "Applied" in client.get(f"/jobs/{job.id}").text
 
-    client.put(f"/jobs/{job.id}/applied")
-    assert _user_states(session)[0].applied_at is not None
 
-    client.delete(f"/jobs/{job.id}/applied")
-    assert _user_states(session)[0].applied_at is None
-
-
-def test_saved_tab_lists_only_bookmarked_jobs(client, session: Session, user: User):
-    search = _add_search(session, user)
-    bookmarked_id = _add_job(session, search, external_id="1", title="Backend Engineer")
-    _add_job(session, search, external_id="2", title="Frontend Engineer")
-    client.put(f"/jobs/{bookmarked_id}/bookmark")
+def test_saved_tab_lists_only_bookmarked_jobs(client, session: Session, scene: Scene):
+    search = scene.user_search()
+    bookmarked = scene.job(search=search, title="Backend Engineer")
+    scene.job(search=search, title="Frontend Engineer")
+    session.flush()  # need bookmarked.id to build the URL below
+    client.put(f"/jobs/{bookmarked.id}/bookmark")
 
     response = client.get("/?show=saved")
     assert response.status_code == 200

@@ -21,7 +21,13 @@ class FakeLLM:
 
     async def assess_job(self, job: Job, criteria_text: str) -> Verdict:
         self.criteria_seen.append(criteria_text)
-        return Verdict(score=self.score, reasoning="good fit")
+        return Verdict(
+            score=self.score,
+            reasoning="good fit",
+            summary="good job",
+            summary_positives="it's a job",
+            summary_negatives="it's a job",
+        )
 
 
 @pytest.mark.asyncio
